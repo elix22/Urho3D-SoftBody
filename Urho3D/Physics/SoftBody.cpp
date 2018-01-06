@@ -53,7 +53,7 @@ static const int MIN_DEACTIVATION_DELAY = 5;
 SoftBody::SoftBody(Context* context) :
     LogicComponent(context),
     centerOfMass_(Vector3::ZERO),
-	mass_(DEFAULT_SOFT_BODY_MASS),
+    mass_(DEFAULT_SOFT_BODY_MASS),
     collisionLayer_(DEFAULT_COLLISION_LAYER),
     collisionMask_(DEFAULT_COLLISION_MASK),
     lastPosition_(Vector3::ZERO),
@@ -107,7 +107,7 @@ void SoftBody::SetPosition(const Vector3& position)
         // When forcing the physics position, set also interpolated position so that there is no jitter
         btTransform interpTrans = body_->getInterpolationWorldTransform();
         interpTrans.setOrigin(worldTrans.getOrigin());
-		body_->transform(interpTrans);
+        body_->transform(interpTrans);
 
         Activate();
         MarkNetworkUpdate();
@@ -128,7 +128,7 @@ void SoftBody::SetRotation(const Quaternion& rotation)
         interpTrans.setRotation(worldTrans.getRotation());
         if (!centerOfMass_.Equals(Vector3::ZERO))
             interpTrans.setOrigin(worldTrans.getOrigin());
-		body_->transform(interpTrans);
+        body_->transform(interpTrans);
 
         Activate();
         MarkNetworkUpdate();
@@ -139,14 +139,14 @@ void SoftBody::SetTransform(const Vector3& position, const Quaternion& rotation)
 {
     if (body_)
     {
-		btTransform worldTrans;
+        btTransform worldTrans;
         worldTrans.setRotation(ToBtQuaternion(rotation));
         worldTrans.setOrigin(ToBtVector3(position + rotation * centerOfMass_));
 
         btTransform interpTrans = body_->getInterpolationWorldTransform();
         interpTrans.setOrigin(worldTrans.getOrigin());
         interpTrans.setRotation(worldTrans.getRotation());
-		body_->transform(worldTrans);
+        body_->transform(worldTrans);
 
         Activate();
         MarkNetworkUpdate();
@@ -229,13 +229,13 @@ void SoftBody::AddBodyToWorld()
     if (mass_ < 0.0f)
         mass_ = 0.0f;
 
-	
-	if (body_)
-	{
-		RemoveBodyFromWorld();
-	}
 
-	if (!body_)
+    if (body_)
+    {
+        RemoveBodyFromWorld();
+    }
+
+    if (!body_)
         return;
 
     UpdateMass();
@@ -243,7 +243,7 @@ void SoftBody::AddBodyToWorld()
     if (!IsEnabledEffective())
         return;
 
-	btSoftRigidDynamicsWorld* world = (btSoftRigidDynamicsWorld*)physicsWorld_->GetWorld();
+    btSoftRigidDynamicsWorld* world = (btSoftRigidDynamicsWorld*)physicsWorld_->GetWorld();
     world->addSoftBody(body_.Get(), (int)collisionLayer_, (int)collisionMask_);
     inWorld_ = true;
     readdBody_ = false;
@@ -331,7 +331,7 @@ void SoftBody::RemoveBodyFromWorld()
 {
     if (physicsWorld_ && body_ && inWorld_)
     {
-		btSoftRigidDynamicsWorld* world = (btSoftRigidDynamicsWorld*)physicsWorld_->GetWorld();
+        btSoftRigidDynamicsWorld* world = (btSoftRigidDynamicsWorld*)physicsWorld_->GetWorld();
         world->removeSoftBody(body_.Get());
         inWorld_ = false;
     }
@@ -342,10 +342,10 @@ void SoftBody::UpdateMass()
     if (!body_ || !enableMassUpdate_)
         return;
 
-	if (mass_ > 0.0f)
-	{
-		body_->setTotalMass(mass_);
-	}
+    if (mass_ > 0.0f)
+    {
+        body_->setTotalMass(mass_);
+    }
 }
 
 void SoftBody::SetVelocity(const Vector3& velocity)
@@ -523,45 +523,45 @@ bool SoftBody::CreateFromModel(Model *model)
         IndexBuffer *ibuffer = geometry->GetIndexBuffer();
 
         unsigned numVertices = vbuffer->GetVertexCount();
-		const unsigned char *vertexData = (const unsigned char*)vbuffer->Lock(0, numVertices);
+        const unsigned char *vertexData = (const unsigned char*)vbuffer->Lock(0, numVertices);
 
         // temp
         PODVector<btScalar> btVertices;
         PODVector<int> btIndices;
 
         if (vertexData)
-		{
+        {
             const unsigned vertexSize = vbuffer->GetVertexSize();
             btVertices.Resize(numVertices * 3);
 
-			for ( unsigned i = 0; i < numVertices; ++i )
-			{
-				const Vector3& v0 = *reinterpret_cast<const Vector3*>(vertexData + i * vertexSize);
-				btVertices[i*3 + 0] = (btScalar)v0.x_;
-				btVertices[i*3 + 1] = (btScalar)v0.y_;
-				btVertices[i*3 + 2] = (btScalar)v0.z_;
+            for ( unsigned i = 0; i < numVertices; ++i )
+            {
+                const Vector3& v0 = *reinterpret_cast<const Vector3*>(vertexData + i * vertexSize);
+                btVertices[i*3 + 0] = (btScalar)v0.x_;
+                btVertices[i*3 + 1] = (btScalar)v0.y_;
+                btVertices[i*3 + 2] = (btScalar)v0.z_;
             }
 
-			vbuffer->Unlock();
-		}
+            vbuffer->Unlock();
+        }
 
         unsigned numIndices = ibuffer->GetIndexCount();
-		const unsigned char *indexData = (const unsigned char*)ibuffer->Lock(0, numIndices);
+        const unsigned char *indexData = (const unsigned char*)ibuffer->Lock(0, numIndices);
 
         if (indexData)
-		{
+        {
             const unsigned indexSize = ibuffer->GetIndexSize();
             btIndices.Resize(numIndices);
 
-			for ( unsigned i = 0; i < numIndices; ++i )
-			{
+            for ( unsigned i = 0; i < numIndices; ++i )
+            {
                 if (indexSize == sizeof(unsigned short))
                 {
-					btIndices[i] = (int)*reinterpret_cast<const unsigned short*>(indexData + i * indexSize);
+                    btIndices[i] = (int)*reinterpret_cast<const unsigned short*>(indexData + i * indexSize);
                 }
                 else
                 {
-					btIndices[i] = (int)*reinterpret_cast<const unsigned*>(indexData + i * indexSize);
+                    btIndices[i] = (int)*reinterpret_cast<const unsigned*>(indexData + i * indexSize);
                 }
             }
 
@@ -588,12 +588,12 @@ void SoftBody::UpdateVertexBuffer(Model *model)
 
         unsigned numVertices = vbuffer->GetVertexCount();
         unsigned elementMask = vbuffer->GetElementMask();
-		unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
+        unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
 
         boundingBox_.Clear();
 
         if (vertexData)
-		{
+        {
             const unsigned vertexSize = vbuffer->GetVertexSize();
 
             if (duplicatePairs_.Size() == 0)
@@ -659,7 +659,7 @@ void SoftBody::UpdateVertexBuffer(Model *model)
                     }
                 }
             }
-			vbuffer->Unlock();
+            vbuffer->Unlock();
         }
     }
 }
