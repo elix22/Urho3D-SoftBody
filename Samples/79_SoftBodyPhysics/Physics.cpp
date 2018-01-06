@@ -231,16 +231,16 @@ void Physics::MoveCamera(float timeStep)
 
     // "Shoot" a physics object with left mousebutton
     if (input->GetMouseButtonPress(MOUSEB_LEFT))
-        SpawnObject(1);
+        SpawnObject(true);
     if (input->GetMouseButtonPress(MOUSEB_RIGHT))
-        SpawnObject(0);
+        SpawnObject(false);
 
     // Toggle physics debug geometry with space
     if (input->GetKeyPress(KEY_SPACE))
         drawDebug_ = !drawDebug_;
 }
 
-void Physics::SpawnObject(int obj)
+void Physics::SpawnObject(bool softbody)
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
     const float OBJECT_VELOCITY = 10.0f;
@@ -248,12 +248,12 @@ void Physics::SpawnObject(int obj)
     // Create a smaller box at camera position
     Node* boxNode = scene_->CreateChild("SmallBox");
 
-    if (obj)
+    if (softbody)
     {
         StaticModel *boxObject = boxNode->CreateComponent<StaticModel>();
-        SharedPtr<Model> model = cache->GetResource<Model>("Models/Sphere.mdl")->Clone();
+        SharedPtr<Model> model = cache->GetResource<Model>("Models/Mushroom.mdl")->Clone();
         boxObject->SetModel(model);
-        boxObject->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml")->Clone());
+        boxObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml")->Clone());
         boxObject->SetCastShadows(true);
 
         SoftBody *softbody = boxNode->CreateComponent<SoftBody>();
