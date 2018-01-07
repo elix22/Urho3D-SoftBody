@@ -49,6 +49,9 @@ public:
     virtual void DelayedStart();
     /// Called on physics post-update, fixed timestep.
     virtual void FixedPostUpdate(float timeStep);
+
+    bool CreateFromStaticModel();
+
     /// Set collision layer.
     void SetCollisionLayer(unsigned layer);
     /// Set collision mask.
@@ -82,13 +85,13 @@ public:
     void ReleaseBody();
     void UpdateMass();
 
-    bool CreateFromModel(Model *model);
-    void UpdateVertexBuffer(Model *model);
 
     void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }
     float GetDeactivationVelocity() const           { return deactivationVelocity_; }
 
 protected:
+    bool CreateFromModel(Model *model);
+    void UpdateVertexBuffer(Model *model);
     /// Handle node transform being dirtied.
     virtual void OnMarkedDirty(Node* node);
     /// Handle node being assigned.

@@ -85,6 +85,18 @@ void SoftBody::DelayedStart()
 {
 }
 
+bool SoftBody::CreateFromStaticModel()
+{
+    StaticModel *smodel = node_->GetComponent<StaticModel>();
+
+    if (smodel)
+    {
+        return CreateFromModel(smodel->GetModel());
+    }
+
+    return false;
+}
+
 void SoftBody::SetMass(float mass)
 {
     mass = Max(mass, 0.0f);
@@ -377,7 +389,7 @@ SharedPtr<Model> SoftBody::PruneModel(Model *model)
             {
                 const Vector3 &v1 = *reinterpret_cast<const Vector3*>(vertexData + j * vertexSize);
 
-                if ((v1 - v0).LengthSquared() < M_EPSILON*M_EPSILON)
+                if ((v1 - v0).LengthSquared() < M_EPSILON)
                 {
                     duplicatePairs_.Push(MakePair(i, j));
                 }

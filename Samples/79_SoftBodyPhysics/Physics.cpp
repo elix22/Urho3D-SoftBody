@@ -257,7 +257,7 @@ void Physics::SpawnObject(bool softbody)
         boxObject->SetCastShadows(true);
 
         SoftBody *softbody = boxNode->CreateComponent<SoftBody>();
-        softbody->CreateFromModel(model);
+        softbody->CreateFromStaticModel();
         softbody->SetTransform(cameraNode_->GetPosition() + cameraNode_->GetDirection(), cameraNode_->GetRotation());
         softbody->SetMass(10.0f);
         softbody->SetVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * OBJECT_VELOCITY);
