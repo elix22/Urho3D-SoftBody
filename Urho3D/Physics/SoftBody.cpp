@@ -514,9 +514,9 @@ void SoftBody::SetDefaultConfiguration()
     if (body_)
     {
         // minimum default settings just to keep the volume, some what, intact
-        body_->m_materials[0]->m_kLST = (btScalar)0.02; // Linear stiffness coefficient [0,1]
-        body_->m_cfg.kMT              =	(btScalar)0.07; // Pose matching coefficient [0,1]
-        body_->m_cfg.kVC              =	(btScalar)0.07; // Volume conservation coefficient [0,+inf]
+        body_->m_materials[0]->m_kLST = (btScalar)0.1; // Linear stiffness coefficient [0,1]
+        body_->m_cfg.kMT              = (btScalar)0.1; // Pose matching coefficient [0,1]
+        body_->m_cfg.kVC              = (btScalar)0.1; // Volume conservation coefficient [0,+inf]
 
         body_->setPose(true, true);
         body_->getCollisionShape()->setMargin(0.04f);
