@@ -89,10 +89,14 @@ public:
     void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }
     float GetDeactivationVelocity() const           { return deactivationVelocity_; }
 
+    void SetCalculateFaceNormals(bool calcFaceNormals){ calcFaceNormals_ = calcFaceNormals; }
+    bool GetCalculateFaceNormals() const              { return calcFaceNormals_; }
+
     static SharedPtr<Model> CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles);
 
 protected:
     bool CreateFromModel(Model *model);
+    void CalculateVertexFaceNormals(Model *model);
     void UpdateVertexBuffer(Model *model);
     /// Handle node transform being dirtied.
     virtual void OnMarkedDirty(Node* node);
@@ -146,6 +150,8 @@ protected:
     Vector<Pair<unsigned, unsigned> > duplicatePairs_;
     /// Vertex remap list.
     PODVector<unsigned> remapList_;
+    /// Normals based on MDL model
+    bool calcFaceNormals_;
 };
 
 }

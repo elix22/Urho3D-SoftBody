@@ -64,7 +64,8 @@ SoftBody::SoftBody(Context* context) :
     inWorld_(false),
     enableMassUpdate_(true),
     deactivationVelocity_(MIN_DEACTIVATION_VELOCITY),
-    deactivationDelay_(0)
+    deactivationDelay_(0),
+    calcFaceNormals_(false)
 {
     SetUpdateEventMask(USE_FIXEDPOSTUPDATE);
 }
@@ -591,6 +592,61 @@ bool SoftBody::CreateFromModel(Model *model)
     return (body_ != NULL);
 }
 
+void SoftBody::CalculateVertexFaceNormals(Model *model)
+{
+    if (model && IsActive())
+    {
+        Geometry *geometry = model->GetGeometry(0, 0);
+        VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
+        IndexBuffer *ibuffer = geometry->GetIndexBuffer();
+
+        const unsigned numVertices = vbuffer->GetVertexCount();
+        const unsigned vertexSize = vbuffer->GetVertexSize();
+        unsigned elementMask = vbuffer->GetElementMask();
+        const unsigned numIndices = ibuffer->GetIndexCount();
+        const unsigned indexSize = ibuffer->GetIndexSize();
+
+        if ((elementMask & MASK_NORMAL) == 0)
+        {
+            return;
+        }
+
+        unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
+        const unsigned char *indexData = (const unsigned char*)ibuffer->Lock(0, numIndices);
+        unsigned i0, i1, i2;
+
+        if (vertexData && indexData)
+        {
+            for (unsigned i = 0; i < numIndices / 3; ++i)
+            {
+                if (indexSize == sizeof(unsigned short))
+                {
+                    i0 = (unsigned)*reinterpret_cast<const unsigned short*>(indexData + (i*3 + 0) * indexSize);
+                    i1 = (unsigned)*reinterpret_cast<const unsigned short*>(indexData + (i*3 + 1) * indexSize);
+                    i2 = (unsigned)*reinterpret_cast<const unsigned short*>(indexData + (i*3 + 2) * indexSize);
+                }
+                else
+                {
+                    i0 = (unsigned)*reinterpret_cast<const unsigned*>(indexData + (i*3 + 0) * indexSize);
+                    i1 = (unsigned)*reinterpret_cast<const unsigned*>(indexData + (i*3 + 1) * indexSize);
+                    i2 = (unsigned)*reinterpret_cast<const unsigned*>(indexData + (i*3 + 2) * indexSize);
+                }
+
+                Vector3 &v0 = *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize);
+                Vector3 &v1 = *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize);
+                Vector3 &v2 = *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize);
+
+                Vector3 n = (v1 - v0).CrossProduct(v2 - v0).Normalized();
+                *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize + sizeof(Vector3)) = n;
+                *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize + sizeof(Vector3)) = n;
+                *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize + sizeof(Vector3)) = n;
+            }
+            vbuffer->Unlock();
+            ibuffer->Unlock();
+        }
+    }
+}
+
 void SoftBody::UpdateVertexBuffer(Model *model)
 {
     if (model && IsActive())
@@ -673,6 +729,11 @@ void SoftBody::UpdateVertexBuffer(Model *model)
                 }
             }
             vbuffer->Unlock();
+        }
+
+        if (calcFaceNormals_)
+        {
+            CalculateVertexFaceNormals(model);
         }
     }
 }
