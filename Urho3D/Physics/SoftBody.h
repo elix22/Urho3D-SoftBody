@@ -89,6 +89,8 @@ public:
     void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }
     float GetDeactivationVelocity() const           { return deactivationVelocity_; }
 
+    static SharedPtr<Model> CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles);
+
 protected:
     bool CreateFromModel(Model *model);
     void UpdateVertexBuffer(Model *model);

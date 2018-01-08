@@ -57,4 +57,5 @@ protected:
 protected:
     /// Flag for drawing debug geometry.
     bool drawDebug_;
+
 };

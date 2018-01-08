@@ -35,6 +35,7 @@
 #include "../Graphics/Geometry.h"
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/IndexBuffer.h"
+#include "../Resource/ResourceCache.h"
 
 #include <Bullet/BulletSoftBody/btSoftBody.h>
 #include <Bullet/BulletSoftBody/btSoftBodyHelpers.h>
@@ -718,6 +719,82 @@ void SoftBody::FixedPostUpdate(float timeStep)
         // required for the body's nodes to accumulate velocity, hence, the delay
         deactivationDelay_ = MIN_DEACTIVATION_DELAY;
     }
+}
+
+SharedPtr<Model> SoftBody::CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles)
+{
+    //**note** I find it easier to rewrite an existing model with new data than to create one from 
+    // scratch to avoid initializing all the required settings for geometry, vertex and index buffer.
+    // The orig model should be the box model, which is the simplest model to clone.
+    Model *origModel = context->GetSubsystem<ResourceCache>()->GetResource<Model>("Model/Box.mdl");
+    SharedPtr<Model> model = origModel->Clone();
+    Geometry *geometry = model->GetGeometry(0, 0);
+    VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
+    IndexBuffer *ibuffer = geometry->GetIndexBuffer();
+    unsigned elementMask = vbuffer->GetElementMask();
+
+    // change vertex buff
+    unsigned newElementMask = MASK_POSITION | MASK_NORMAL;
+    vbuffer->SetSize(numVertices, newElementMask);
+    unsigned vertexSize = vbuffer->GetVertexSize();
+    unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
+
+    // change index buff
+    ibuffer->SetSize(numTriangles*3, false);
+    unsigned short *ushortData = (unsigned short*)ibuffer->Lock(0, ibuffer->GetIndexCount());
+    BoundingBox boundingBox;
+
+    if (vertexData && ushortData)
+    {
+        for ( int i = 0; i < numVertices; ++i )
+        {
+            Vector3 v = Vector3(varray[i*3], varray[i*3 + 1], varray[i*3 + 2]);
+
+            boundingBox.Merge(v);
+
+            *reinterpret_cast<Vector3*>(vertexData + i * vertexSize) = v;
+
+            // init normal
+            *reinterpret_cast<Vector3*>(vertexData + i * vertexSize + sizeof(Vector3)) = Vector3::ZERO;
+        }
+
+        for ( int i = 0; i < numTriangles; ++i )
+        {
+            unsigned short i0 = (unsigned short)iarray[i * 3 + 0];
+            unsigned short i1 = (unsigned short)iarray[i * 3 + 1];
+            unsigned short i2 = (unsigned short)iarray[i * 3 + 2];
+
+            *reinterpret_cast<unsigned short*>(ushortData + (i * 3 + 0)) = i0;
+            *reinterpret_cast<unsigned short*>(ushortData + (i * 3 + 1)) = i1;
+            *reinterpret_cast<unsigned short*>(ushortData + (i * 3 + 2)) = i2;
+
+            // calc and sum normals
+            Vector3 v0 = *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize);
+            Vector3 v1 = *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize);
+            Vector3 v2 = *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize);
+
+            Vector3 n = (v1 - v0).CrossProduct(v2 - v0).Normalized();
+            *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize + sizeof(Vector3)) += n;
+            *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize + sizeof(Vector3)) += n;
+            *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize + sizeof(Vector3)) += n;
+        }
+
+        // normalize normals
+        for ( int i = 0; i < numVertices; ++i )
+        {
+            Vector3 &n = *reinterpret_cast<Vector3*>(vertexData + i * vertexSize + sizeof(Vector3));
+            n.Normalize();
+        }
+
+        vbuffer->Unlock();
+        ibuffer->Unlock();
+    }
+
+    // finalize
+    geometry->SetDrawRange(geometry->GetPrimitiveType(), 0, numTriangles*3, 0, numVertices, false);
+    model->SetBoundingBox(boundingBox);
+
+    return model;
 }
 
 

@@ -68,6 +68,7 @@ void Physics::Setup()
     engineParameters_["Headless"]      = false;
     engineParameters_["WindowWidth"]   = 1280; 
     engineParameters_["WindowHeight"]  = 720;
+    engineParameters_["ResourcePaths"] = "Data;CoreData;Data/SoftBody;";
 }
 
 void Physics::Start()
@@ -91,49 +92,13 @@ void Physics::CreateScene()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
 
+    // **note** how-to create softbody physic world in code
+    // PhysicsWorld *physicsWorld = new PhysicsWorld(context_, true);
+    // scene_->AddComponent(physicsWorld, 0, REPLICATED);
+
     scene_ = new Scene(context_);
-    scene_->CreateComponent<Octree>();
-    PhysicsWorld *physicsWorld = new PhysicsWorld(context_, true);
-    scene_->AddComponent(physicsWorld, 0, REPLICATED);
-    scene_->CreateComponent<DebugRenderer>();
-
-    // Create a Zone component for ambient lighting & fog control
-    Node* zoneNode = scene_->CreateChild("Zone");
-    Zone* zone = zoneNode->CreateComponent<Zone>();
-    zone->SetBoundingBox(BoundingBox(-1000.0f, 1000.0f));
-    zone->SetAmbientColor(Color(0.15f, 0.15f, 0.15f));
-    zone->SetFogColor(Color(1.0f, 1.0f, 1.0f));
-    zone->SetFogStart(300.0f);
-    zone->SetFogEnd(500.0f);
-
-    // Create a directional light to the world. Enable cascaded shadows on it
-    Node* lightNode = scene_->CreateChild("DirectionalLight");
-    lightNode->SetDirection(Vector3(0.6f, -1.0f, 0.8f));
-    Light* light = lightNode->CreateComponent<Light>();
-    light->SetLightType(LIGHT_DIRECTIONAL);
-    light->SetCastShadows(true);
-    light->SetShadowBias(BiasParameters(0.00025f, 0.5f));
-    light->SetShadowCascade(CascadeParameters(10.0f, 50.0f, 200.0f, 0.0f, 0.8f));
-
-    Node* skyNode = scene_->CreateChild("Sky");
-    skyNode->SetScale(500.0f); // The scale actually does not matter
-    Skybox* skybox = skyNode->CreateComponent<Skybox>();
-    skybox->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-    skybox->SetMaterial(cache->GetResource<Material>("Materials/Skybox.xml"));
-
-    {
-        // Create a floor object, 1000 x 1000 world units. Adjust position so that the ground is at zero Y
-        Node* floorNode = scene_->CreateChild("Floor");
-        floorNode->SetPosition(Vector3(0.0f, -0.5f, 0.0f));
-        floorNode->SetScale(Vector3(1000.0f, 1.0f, 1000.0f));
-        StaticModel* floorObject = floorNode->CreateComponent<StaticModel>();
-        floorObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-        floorObject->SetMaterial(cache->GetResource<Material>("Materials/StoneTiled.xml"));
-
-        /*RigidBody* body = */floorNode->CreateComponent<RigidBody>();
-        CollisionShape* shape = floorNode->CreateComponent<CollisionShape>();
-        shape->SetBox(Vector3::ONE);
-    }
+    XMLFile *xmlLevel = cache->GetResource<XMLFile>("SoftBody/Scenes/scene1.xml");
+    scene_->LoadXML(xmlLevel->GetRoot());
 
     // Create the camera.
     cameraNode_ = new Node(context_);
@@ -157,7 +122,7 @@ void Physics::CreateInstructions()
         "SPACEBAR: dbg physics\n"
     );
     instructionText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 12);
-    instructionText->SetColor(Color::CYAN);
+    instructionText->SetColor(Color::GREEN);
     // The text has multiple rows. Center them in relation to each other
     instructionText->SetTextAlignment(HA_CENTER);
 
@@ -251,9 +216,9 @@ void Physics::SpawnObject(bool softbody)
     if (softbody)
     {
         StaticModel *boxObject = boxNode->CreateComponent<StaticModel>();
-        SharedPtr<Model> model = cache->GetResource<Model>("Models/Mushroom.mdl")->Clone();
+        SharedPtr<Model> model = cache->GetResource<Model>("Models/Sphere.mdl")->Clone();
         boxObject->SetModel(model);
-        boxObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml")->Clone());
+        boxObject->SetMaterial(cache->GetResource<Material>("Materials/uvMat.xml")->Clone());
         boxObject->SetCastShadows(true);
 
         SoftBody *softbody = boxNode->CreateComponent<SoftBody>();
@@ -262,7 +227,6 @@ void Physics::SpawnObject(bool softbody)
         softbody->SetMass(10.0f);
         softbody->SetVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * OBJECT_VELOCITY);
         softbody->Activate();
-
     }
     else
     {
@@ -271,7 +235,7 @@ void Physics::SpawnObject(bool softbody)
         boxNode->SetScale(0.5f);
         StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
         boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-        boxObject->SetMaterial(cache->GetResource<Material>("Materials/StoneEnvMapSmall.xml"));
+        boxObject->SetMaterial(cache->GetResource<Material>("Materials/cubeMat.xml"));
         boxObject->SetCastShadows(true);
 
         // Create physics components, use a smaller mass also
@@ -301,3 +265,4 @@ void Physics::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData
         scene_->GetComponent<PhysicsWorld>()->DrawDebugGeometry(debugRenderer, true);
     }
 }
+
