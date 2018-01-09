@@ -85,16 +85,14 @@ public:
     void ReleaseBody();
     void UpdateMass();
 
-    void SetConfigLST(float lst) { configLST_ = lst; }
-    float GetConfigLST() const   { return configLST_; }
+    void SetConfigLST(float lst);
+    void SetConfigMT(float mt);
+    void SetConfigVC(float vc);
+    void SetConfigPR(float pr);
 
-    void SetConfigMT(float mt)   { configMT_ = mt; }
+    float GetConfigLST() const   { return configLST_; }
     float GetConfigMT() const    { return configMT_; }
-                                 
-    void SetConfigVC(float vc)   { configVC_ = vc; }
     float GetConfigVC() const    { return configVC_; }
-                                 
-    void SetConfigPR(float pr)   { configPR_ = pr; }
     float GetConfigPR() const    { return configPR_; }
 
     void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }

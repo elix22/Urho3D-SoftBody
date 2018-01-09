@@ -531,6 +531,42 @@ void SoftBody::SetDefaultConfiguration()
     }
 }
 
+void SoftBody::SetConfigLST(float lst)
+{
+    if (body_)
+    {
+        configLST_ = lst;
+        body_->m_materials[0]->m_kLST = configLST_;
+    }
+}
+
+void SoftBody::SetConfigMT(float mt)
+{
+    if (body_)
+    {
+        configMT_ = mt;
+        body_->m_cfg.kMT = configMT_;
+    }
+}
+
+void SoftBody::SetConfigVC(float vc)
+{
+    if (body_)
+    {
+        configVC_ = vc;
+        body_->m_cfg.kVC = configVC_;
+    }
+}
+
+void SoftBody::SetConfigPR(float pr)
+{
+    if (body_)
+    {
+        configPR_ = pr;
+        body_->m_cfg.kPR = configPR_;
+    }
+}
+
 bool SoftBody::CreateFromModel(Model *model)
 {
     if (model)
