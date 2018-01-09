@@ -98,14 +98,14 @@ public:
     void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }
     float GetDeactivationVelocity() const           { return deactivationVelocity_; }
 
-    void SetCalculateFaceNormals(bool calcFaceNormals){ calcFaceNormals_ = calcFaceNormals; }
-    bool GetCalculateFaceNormals() const              { return calcFaceNormals_; }
+    void SetFaceNormals(bool setFaceNormals)        { setToFaceNormals_ = setFaceNormals; }
+    bool GetFaceNormals() const                     { return setToFaceNormals_; }
 
     static SharedPtr<Model> CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles);
 
 protected:
     bool CreateFromModel(Model *model);
-    void CalculateVertexFaceNormals(Model *model);
+    void SetToFaceNormals(Model *model);
     void UpdateVertexBuffer(Model *model);
     /// Handle node transform being dirtied.
     virtual void OnMarkedDirty(Node* node);
@@ -160,11 +160,14 @@ protected:
     /// Vertex remap list.
     PODVector<unsigned> remapList_;
     /// Normals based on MDL model
-    bool calcFaceNormals_;
-    /// config
+    bool setToFaceNormals_;
+    /// Linear stiffness coefficient [0,1]
     float configLST_;
+    /// Pose matching coefficient [0,1]
     float configMT_;
+    /// Volume conservation coefficient [0,+inf]
     float configVC_;
+    /// Pressure coefficient [-inf,+inf]
     float configPR_;
 };
 

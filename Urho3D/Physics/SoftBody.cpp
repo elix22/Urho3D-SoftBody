@@ -66,7 +66,7 @@ SoftBody::SoftBody(Context* context) :
     enableMassUpdate_(true),
     deactivationVelocity_(MIN_DEACTIVATION_VELOCITY),
     deactivationDelay_(0),
-    calcFaceNormals_(false),
+    setToFaceNormals_(false),
     configLST_(0.1f),
     configMT_(0.1f),
     configVC_(0.1f),
@@ -375,6 +375,125 @@ void SoftBody::SetVelocity(const Vector3& velocity)
     }
 }
 
+void SoftBody::SetDefaultConfiguration()
+{
+    if (body_)
+    {
+        // minimum default settings just to keep the volume, some what, intact
+        body_->m_materials[0]->m_kLST = (btScalar)configLST_; // Linear stiffness coefficient [0,1]
+        body_->m_cfg.kMT              = (btScalar)configMT_;  // Pose matching coefficient [0,1]
+        body_->m_cfg.kVC              = (btScalar)configVC_;  // Volume conservation coefficient [0,+inf]
+        body_->m_cfg.kPR              = (btScalar)configPR_;  // Pressure coefficient [-inf,+inf]
+
+        body_->setPose(true, true);
+        body_->getCollisionShape()->setMargin(DEFAULT_COLLISION_MARGIN);
+    }
+}
+
+void SoftBody::SetConfigLST(float lst)
+{
+    if (body_)
+    {
+        configLST_ = lst;
+        body_->m_materials[0]->m_kLST = configLST_;
+    }
+}
+
+void SoftBody::SetConfigMT(float mt)
+{
+    if (body_)
+    {
+        configMT_ = mt;
+        body_->m_cfg.kMT = configMT_;
+    }
+}
+
+void SoftBody::SetConfigVC(float vc)
+{
+    if (body_)
+    {
+        configVC_ = vc;
+        body_->m_cfg.kVC = configVC_;
+    }
+}
+
+void SoftBody::SetConfigPR(float pr)
+{
+    if (body_)
+    {
+        configPR_ = pr;
+        body_->m_cfg.kPR = configPR_;
+    }
+}
+
+bool SoftBody::CreateFromModel(Model *model)
+{
+    if (model)
+    {
+        // prune the model and remove all duplicate verts
+        SharedPtr<Model> pmodel = PruneModel(model);
+
+        Geometry *geometry = pmodel->GetGeometry(0, 0);
+        VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
+        IndexBuffer *ibuffer = geometry->GetIndexBuffer();
+
+        unsigned numVertices = vbuffer->GetVertexCount();
+        const unsigned char *vertexData = (const unsigned char*)vbuffer->Lock(0, numVertices);
+
+        // temp
+        PODVector<btScalar> btVertices;
+        PODVector<int> btIndices;
+
+        if (vertexData)
+        {
+            const unsigned vertexSize = vbuffer->GetVertexSize();
+            btVertices.Resize(numVertices * 3);
+
+            for ( unsigned i = 0; i < numVertices; ++i )
+            {
+                const Vector3& v0 = *reinterpret_cast<const Vector3*>(vertexData + i * vertexSize);
+                btVertices[i*3 + 0] = (btScalar)v0.x_;
+                btVertices[i*3 + 1] = (btScalar)v0.y_;
+                btVertices[i*3 + 2] = (btScalar)v0.z_;
+            }
+
+            vbuffer->Unlock();
+        }
+
+        unsigned numIndices = ibuffer->GetIndexCount();
+        const unsigned char *indexData = (const unsigned char*)ibuffer->Lock(0, numIndices);
+
+        if (indexData)
+        {
+            const unsigned indexSize = ibuffer->GetIndexSize();
+            btIndices.Resize(numIndices);
+
+            for ( unsigned i = 0; i < numIndices; ++i )
+            {
+                if (indexSize == sizeof(unsigned short))
+                {
+                    btIndices[i] = (int)*reinterpret_cast<const unsigned short*>(indexData + i * indexSize);
+                }
+                else
+                {
+                    btIndices[i] = (int)*reinterpret_cast<const unsigned*>(indexData + i * indexSize);
+                }
+            }
+
+            ibuffer->Unlock();
+        }
+
+        // create
+        body_ = btSoftBodyHelpers::CreateFromTriMesh(*physicsWorld_->GetWorldInfo(), &btVertices[0], &btIndices[0], (int)numIndices/3);
+
+        // set default config
+        SetDefaultConfiguration();
+    }
+
+    return (body_ != NULL);
+}
+
+
 SharedPtr<Model> SoftBody::PruneModel(Model *model)
 {
     Geometry *geometry = model->GetGeometry(0, 0);
@@ -516,125 +635,7 @@ SharedPtr<Model> SoftBody::PruneModel(Model *model)
     return cloneModel;
 }
 
-void SoftBody::SetDefaultConfiguration()
-{
-    if (body_)
-    {
-        // minimum default settings just to keep the volume, some what, intact
-        body_->m_materials[0]->m_kLST = (btScalar)configLST_; // Linear stiffness coefficient [0,1]
-        body_->m_cfg.kMT              = (btScalar)configMT_;  // Pose matching coefficient [0,1]
-        body_->m_cfg.kVC              = (btScalar)configVC_;  // Volume conservation coefficient [0,+inf]
-        body_->m_cfg.kPR              = (btScalar)configPR_;  // Pressure coefficient [-inf,+inf]
-
-        body_->setPose(true, true);
-        body_->getCollisionShape()->setMargin(DEFAULT_COLLISION_MARGIN);
-    }
-}
-
-void SoftBody::SetConfigLST(float lst)
-{
-    if (body_)
-    {
-        configLST_ = lst;
-        body_->m_materials[0]->m_kLST = configLST_;
-    }
-}
-
-void SoftBody::SetConfigMT(float mt)
-{
-    if (body_)
-    {
-        configMT_ = mt;
-        body_->m_cfg.kMT = configMT_;
-    }
-}
-
-void SoftBody::SetConfigVC(float vc)
-{
-    if (body_)
-    {
-        configVC_ = vc;
-        body_->m_cfg.kVC = configVC_;
-    }
-}
-
-void SoftBody::SetConfigPR(float pr)
-{
-    if (body_)
-    {
-        configPR_ = pr;
-        body_->m_cfg.kPR = configPR_;
-    }
-}
-
-bool SoftBody::CreateFromModel(Model *model)
-{
-    if (model)
-    {
-        // prune the model and remove all duplicate verts
-        SharedPtr<Model> pmodel = PruneModel(model);
-
-        Geometry *geometry = pmodel->GetGeometry(0, 0);
-        VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
-        IndexBuffer *ibuffer = geometry->GetIndexBuffer();
-
-        unsigned numVertices = vbuffer->GetVertexCount();
-        const unsigned char *vertexData = (const unsigned char*)vbuffer->Lock(0, numVertices);
-
-        // temp
-        PODVector<btScalar> btVertices;
-        PODVector<int> btIndices;
-
-        if (vertexData)
-        {
-            const unsigned vertexSize = vbuffer->GetVertexSize();
-            btVertices.Resize(numVertices * 3);
-
-            for ( unsigned i = 0; i < numVertices; ++i )
-            {
-                const Vector3& v0 = *reinterpret_cast<const Vector3*>(vertexData + i * vertexSize);
-                btVertices[i*3 + 0] = (btScalar)v0.x_;
-                btVertices[i*3 + 1] = (btScalar)v0.y_;
-                btVertices[i*3 + 2] = (btScalar)v0.z_;
-            }
-
-            vbuffer->Unlock();
-        }
-
-        unsigned numIndices = ibuffer->GetIndexCount();
-        const unsigned char *indexData = (const unsigned char*)ibuffer->Lock(0, numIndices);
-
-        if (indexData)
-        {
-            const unsigned indexSize = ibuffer->GetIndexSize();
-            btIndices.Resize(numIndices);
-
-            for ( unsigned i = 0; i < numIndices; ++i )
-            {
-                if (indexSize == sizeof(unsigned short))
-                {
-                    btIndices[i] = (int)*reinterpret_cast<const unsigned short*>(indexData + i * indexSize);
-                }
-                else
-                {
-                    btIndices[i] = (int)*reinterpret_cast<const unsigned*>(indexData + i * indexSize);
-                }
-            }
-
-            ibuffer->Unlock();
-        }
-
-        // create
-        body_ = btSoftBodyHelpers::CreateFromTriMesh(*physicsWorld_->GetWorldInfo(), &btVertices[0], &btIndices[0], (int)numIndices/3);
-
-        // set default config
-        SetDefaultConfiguration();
-    }
-
-    return (body_ != NULL);
-}
-
-void SoftBody::CalculateVertexFaceNormals(Model *model)
+void SoftBody::SetToFaceNormals(Model *model)
 {
     if (model && IsActive())
     {
@@ -773,9 +774,9 @@ void SoftBody::UpdateVertexBuffer(Model *model)
             vbuffer->Unlock();
         }
 
-        if (calcFaceNormals_)
+        if (setToFaceNormals_)
         {
-            CalculateVertexFaceNormals(model);
+            SetToFaceNormals(model);
         }
     }
 }

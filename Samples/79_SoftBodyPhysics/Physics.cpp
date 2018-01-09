@@ -229,7 +229,7 @@ void Physics::SpawnObject(bool softbody)
 
         // recalculate normals based on the mdl triangle faces
         // consider enabling this only for models such as a box
-        //softbody->SetCalculateFaceNormals(true);
+        //softbody->SetFaceNormals(true);
     }
     else
     {
