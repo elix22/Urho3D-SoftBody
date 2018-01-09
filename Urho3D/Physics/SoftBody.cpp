@@ -46,6 +46,7 @@ namespace Urho3D
 extern const char* PHYSICS_CATEGORY;
 
 static const float DEFAULT_SOFT_BODY_MASS = 0.0f;
+static const float DEFAULT_COLLISION_MARGIN = 0.04f;
 static const unsigned DEFAULT_COLLISION_LAYER = 0x1;
 static const unsigned DEFAULT_COLLISION_MASK = 0xffff;
 static const float MIN_DEACTIVATION_VELOCITY = 0.02666f;
@@ -65,7 +66,11 @@ SoftBody::SoftBody(Context* context) :
     enableMassUpdate_(true),
     deactivationVelocity_(MIN_DEACTIVATION_VELOCITY),
     deactivationDelay_(0),
-    calcFaceNormals_(false)
+    calcFaceNormals_(false),
+    configLST_(0.1f),
+    configMT_(0.1f),
+    configVC_(0.1f),
+    configPR_(1.0f)
 {
     SetUpdateEventMask(USE_FIXEDPOSTUPDATE);
 }
@@ -516,12 +521,13 @@ void SoftBody::SetDefaultConfiguration()
     if (body_)
     {
         // minimum default settings just to keep the volume, some what, intact
-        body_->m_materials[0]->m_kLST = (btScalar)0.1; // Linear stiffness coefficient [0,1]
-        body_->m_cfg.kMT              = (btScalar)0.1; // Pose matching coefficient [0,1]
-        body_->m_cfg.kVC              = (btScalar)0.1; // Volume conservation coefficient [0,+inf]
+        body_->m_materials[0]->m_kLST = (btScalar)configLST_; // Linear stiffness coefficient [0,1]
+        body_->m_cfg.kMT              = (btScalar)configMT_;  // Pose matching coefficient [0,1]
+        body_->m_cfg.kVC              = (btScalar)configVC_;  // Volume conservation coefficient [0,+inf]
+        body_->m_cfg.kPR              = (btScalar)configPR_;  // Pressure coefficient [-inf,+inf]
 
         body_->setPose(true, true);
-        body_->getCollisionShape()->setMargin(0.04f);
+        body_->getCollisionShape()->setMargin(DEFAULT_COLLISION_MARGIN);
     }
 }
 
