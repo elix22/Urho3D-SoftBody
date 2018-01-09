@@ -44,6 +44,8 @@ public:
     virtual ~SoftBody();
     /// Register object factory.
     static void RegisterObject(Context* context);
+    /// Generate model based on Bullet Mesh.
+    static SharedPtr<Model> CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles);
 
     /// Called before the first update. At this point all other components of the node should exist. Will also be called if update events are not wanted; in that case the event is immediately unsubscribed afterward.
     virtual void DelayedStart();
@@ -66,7 +68,9 @@ public:
     void SetRotation(const Quaternion& rotation);
     /// Set rigid body position and rotation in world space as an atomic operation.
     void SetTransform(const Vector3& position, const Quaternion& rotation);
+    /// Set scale.
     void SetScale(const Vector3& scale);
+    /// Set velocity.
     void SetVelocity(const Vector3& velocity);
 
     /// Return Bullet soft body.
@@ -80,28 +84,26 @@ public:
 
     /// Activate.
     void Activate();
+    /// Is Active.
     bool IsActive() const;
     /// Remove the rigid body.
     void ReleaseBody();
+    /// Update mass.
     void UpdateMass();
 
+    void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }
+    void SetFaceNormals(bool setFaceNormals)        { setToFaceNormals_ = setFaceNormals; }
     void SetConfigLST(float lst);
     void SetConfigMT(float mt);
     void SetConfigVC(float vc);
     void SetConfigPR(float pr);
 
-    float GetConfigLST() const   { return configLST_; }
-    float GetConfigMT() const    { return configMT_; }
-    float GetConfigVC() const    { return configVC_; }
-    float GetConfigPR() const    { return configPR_; }
-
-    void SetDeactivationVelocity(float deactiveVel) { deactivationVelocity_ = deactiveVel; }
-    float GetDeactivationVelocity() const           { return deactivationVelocity_; }
-
-    void SetFaceNormals(bool setFaceNormals)        { setToFaceNormals_ = setFaceNormals; }
-    bool GetFaceNormals() const                     { return setToFaceNormals_; }
-
-    static SharedPtr<Model> CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles);
+    float GetDeactivationVelocity() const   { return deactivationVelocity_; }
+    bool GetFaceNormals() const             { return setToFaceNormals_; }
+    float GetConfigLST() const              { return configLST_; }
+    float GetConfigMT() const               { return configMT_; }
+    float GetConfigVC() const               { return configVC_; }
+    float GetConfigPR() const               { return configPR_; }
 
 protected:
     bool CreateFromModel(Model *model);

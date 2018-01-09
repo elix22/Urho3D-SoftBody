@@ -51,6 +51,8 @@ static const unsigned DEFAULT_COLLISION_LAYER = 0x1;
 static const unsigned DEFAULT_COLLISION_MASK = 0xffff;
 static const float MIN_DEACTIVATION_VELOCITY = 0.02666f;
 static const int MIN_DEACTIVATION_DELAY = 5;
+static const float DEFAULT_CONFIG_VALUE = 0.1f;
+static const float DEFAULT_CONFIG_PR = 1.0f;
 
 SoftBody::SoftBody(Context* context) :
     LogicComponent(context),
@@ -67,10 +69,10 @@ SoftBody::SoftBody(Context* context) :
     deactivationVelocity_(MIN_DEACTIVATION_VELOCITY),
     deactivationDelay_(0),
     setToFaceNormals_(false),
-    configLST_(0.1f),
-    configMT_(0.1f),
-    configVC_(0.1f),
-    configPR_(1.0f)
+    configLST_(DEFAULT_CONFIG_VALUE),
+    configMT_(DEFAULT_CONFIG_VALUE),
+    configVC_(DEFAULT_CONFIG_VALUE),
+    configPR_(DEFAULT_CONFIG_PR)
 {
     SetUpdateEventMask(USE_FIXEDPOSTUPDATE);
 }
@@ -637,7 +639,7 @@ SharedPtr<Model> SoftBody::PruneModel(Model *model)
 
 void SoftBody::SetToFaceNormals(Model *model)
 {
-    if (model && IsActive())
+    if (model && IsActive() && duplicatePairs_.Size())
     {
         Geometry *geometry = model->GetGeometry(0, 0);
         VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
