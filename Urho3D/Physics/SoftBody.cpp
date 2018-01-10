@@ -495,7 +495,6 @@ bool SoftBody::CreateFromModel(Model *model)
     return (body_ != NULL);
 }
 
-
 SharedPtr<Model> SoftBody::PruneModel(Model *model)
 {
     Geometry *geometry = model->GetGeometry(0, 0);
@@ -832,7 +831,7 @@ SharedPtr<Model> SoftBody::CreateModelFromBulletMesh(Context *context, float *va
     //**note** I find it easier to rewrite an existing model with new data than to create one from 
     // scratch to avoid initializing all the required settings for geometry, vertex and index buffer.
     // The orig model should be the box model, which is the simplest model to clone.
-    Model *origModel = context->GetSubsystem<ResourceCache>()->GetResource<Model>("Model/Box.mdl");
+    Model *origModel = context->GetSubsystem<ResourceCache>()->GetResource<Model>("Models/Box.mdl");
     SharedPtr<Model> model = origModel->Clone();
     Geometry *geometry = model->GetGeometry(0, 0);
     VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
@@ -875,9 +874,9 @@ SharedPtr<Model> SoftBody::CreateModelFromBulletMesh(Context *context, float *va
             *reinterpret_cast<unsigned short*>(ushortData + (i * 3 + 2)) = i2;
 
             // calc and sum normals
-            Vector3 v0 = *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize);
-            Vector3 v1 = *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize);
-            Vector3 v2 = *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize);
+            const Vector3 &v0 = *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize);
+            const Vector3 &v1 = *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize);
+            const Vector3 &v2 = *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize);
 
             Vector3 n = (v1 - v0).CrossProduct(v2 - v0).Normalized();
             *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize + sizeof(Vector3)) += n;
