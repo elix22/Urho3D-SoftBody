@@ -6,7 +6,7 @@ Bullet Physics SoftBody implementation for Urho3D. Originally, this implmentatio
   
 #### Implementation Setup
 * SoftBody nodes are in world space.
-* the copy to the vertex buffer is not transformed into local space.
+* The copy to the vertex buffer is not transformed into local space.
 * Urho3D Nodes are kept at zero position and rotation. 
 
 You can change it to the typical setup by setting model Node in world space and vertex buffer in local space, but I suspect there will be significant performance hit implementing this process.  If you'd like to tackle this and have questions on how to do it, post a message on the Urho3D discourse.
