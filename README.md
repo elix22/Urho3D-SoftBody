@@ -6,15 +6,15 @@ Bullet Physics SoftBody implementation for Urho3D. Originally, this implmentatio
   
 #### Implementation Setup
 * SoftBody nodes are in world space.
-* The copy to the vertex buffer is not transformed into local space.
+* The vertex buffer copy does not transform SoftBody nodes into local space.
 * Urho3D Nodes are kept at zero position and rotation. 
 
-You can change it to the typical setup by setting model Node in world space and vertex buffer in local space, but I suspect there will be significant performance hit implementing this process.  If you'd like to tackle this and have questions on how to do it, post a message on the Urho3D discourse.
+You can change it to the typical setup by placing model Node in world space and vertex buffer in local space, but I suspect there will be a significant performance hit implementing this process.  If you'd like to tackle this and have questions on how to do it, post a message on the Urho3D discourse.
 
 ---
 ### Notable Settings
 * ConfigPR - when a softbody encounters a high collision impact, there are times when all its face normals get reversed. To prevent it, set the **ConfigPR** with a high value, default=1.0.
-* SetFaceNormal - apply face normal instead of average normal caused by duplicate vert removal, not applicable for Bullet generated mesh, default=false.
+* SetFaceNormal - apply face normal instead of average normal caused by duplicate vert removal and SoftBody update, not applicable for Bullet generated mesh, default=false.
 
 ---
 ### To Build
