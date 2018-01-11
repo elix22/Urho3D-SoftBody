@@ -804,6 +804,12 @@ void SoftBody::CheckRestCondition()
             deactivationDelay_ = MIN_DEACTIVATION_DELAY;
         }
     }
+    else
+    {
+        // when a softbody transitions from sleep state to active state, a few ticks are 
+        // required for the body's nodes to accumulate velocity, hence, the delay
+        deactivationDelay_ = MIN_DEACTIVATION_DELAY;
+    }
 }
 
 void SoftBody::FixedPostUpdate(float timeStep)
@@ -817,16 +823,10 @@ void SoftBody::FixedPostUpdate(float timeStep)
             UpdateVertexBuffer(statModel->GetModel());
             statModel->SetBoundingBox(boundingBox_);
         }
+    }
 
-        // check if at rest
-        CheckRestCondition();
-    }
-    else
-    {
-        // when a softbody transitions from sleep state to active state, a few ticks are 
-        // required for the body's nodes to accumulate velocity, hence, the delay
-        deactivationDelay_ = MIN_DEACTIVATION_DELAY;
-    }
+    // check if at rest
+    CheckRestCondition();
 }
 
 SharedPtr<Model> SoftBody::CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles)
