@@ -799,6 +799,9 @@ void SoftBody::CheckRestCondition()
         if (cumulativeVelocity < deactivationVelocity_ && --deactivationDelay_ < 0)
         {
             body_->forceActivationState(ISLAND_SLEEPING);
+
+            // delay deactivation 
+            deactivationDelay_ = MIN_DEACTIVATION_DELAY;
         }
     }
 }
