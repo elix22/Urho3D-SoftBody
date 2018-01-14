@@ -21,20 +21,23 @@
 //
 
 #include <Urho3D/Core/Context.h>
+#include <Urho3D/Scene/Scene.h>
 #include <Urho3D/Physics/RigidBody.h>
 #include <Urho3D/Physics/SoftBody.h>
-#include <Urho3D/Physics/CollisionShape.h>
 #include <Urho3D/Resource/ResourceCache.h>
-#include <Urho3D/Scene/Scene.h>
+#include <Urho3D/Graphics/Material.h>
+#include <Urho3D/Graphics/Model.h>
+#include <Urho3D/Graphics/StaticModel.h>
 
 #include "SoftBodyHelper.h"
 
 #include <Urho3D/DebugNew.h>
 //=============================================================================
-// just a place holder atm.
 //=============================================================================
 SoftBodyHelper::SoftBodyHelper(Context* context)
     : Component(context)
+    , makeType_(Make_Invalid)
+    , spacing_(1.0f)
 {
 }
 
@@ -42,12 +45,47 @@ void SoftBodyHelper::RegisterObject(Context* context)
 {
     context->RegisterFactory<SoftBodyHelper>();
    
-    URHO3D_ATTRIBUTE("Make Type", unsigned, makeType_, 0, AM_DEFAULT);
-    URHO3D_ATTRIBUTE("Node Name", String, nodeName_, String::EMPTY, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Make Type", unsigned, makeType_, Make_Invalid, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Spacing", float, spacing_, 1.0f, AM_DEFAULT);
 }
 
 void SoftBodyHelper::ApplyAttributes()
 {
+    if (makeType_ == Make_Sticks)
+    {
+        MakeSticks();
+    }
+}
+
+void SoftBodyHelper::MakeSticks()
+{
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+    Model *model = cache->GetResource<Model>("Models/Stick.mdl");
+    Vector3 nodepos = node_->GetWorldPosition();
+
+    int n = 16;
+    int sg = 4;
+    float sz = 5.0f;
+    float hg = 2.0f;
+
+    for ( int y = 0; y < n; ++y )
+    {
+        for ( int x = 0; x < n; ++x )
+        {
+            Vector3 pos = nodepos + Vector3((float)x * spacing_, 0.0f, (float)y * spacing_);
+            Node *node = GetScene()->CreateChild();
+            node->SetPosition(pos);
+
+            StaticModel *statModel = node->CreateComponent<StaticModel>();
+            statModel->SetModel(model);
+            statModel->SetMaterial(cache->GetResource<Material>("Materials/GreenMAT.xml"));
+
+            SoftBody *softbody = node->CreateComponent<SoftBody>();
+            softbody->SetSoftBodyType(SOFTBODY_STICK);
+            softbody->SetMass(0.01f);
+            softbody->SetDeactivationVelocity(0.001f);
+        }
+    }
 }
 
 

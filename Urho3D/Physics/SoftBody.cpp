@@ -37,6 +37,8 @@
 #include "../Graphics/VertexBuffer.h"
 #include "../Graphics/IndexBuffer.h"
 #include "../Resource/ResourceCache.h"
+#include "..//IO/File.h"
+#include "..//IO/FileSystem.h"
 
 #include <Bullet/BulletSoftBody/btSoftBody.h>
 #include <Bullet/BulletSoftBody/btSoftBodyHelpers.h>
@@ -46,6 +48,14 @@ namespace Urho3D
 
 extern const char* PHYSICS_CATEGORY;
 
+static const char* typeNames[] =
+{
+    "TriMesh",
+    "Stick",
+    "Rope",
+    0
+};
+
 static const float DEFAULT_SOFT_BODY_MASS = 0.0f;
 static const float DEFAULT_COLLISION_MARGIN = 0.04f;
 static const unsigned DEFAULT_COLLISION_LAYER = 0x1;
@@ -54,9 +64,11 @@ static const float MIN_DEACTIVATION_VELOCITY = 0.02666f;
 static const int MIN_DEACTIVATION_DELAY = 5;
 static const float DEFAULT_CONFIG_VALUE = 0.1f;
 static const float DEFAULT_CONFIG_PR = 1.0f;
+static const float MIN_ROPE_HEIGHT_TOLERANCE = 0.01f;
 
 SoftBody::SoftBody(Context* context) :
     LogicComponent(context),
+    softBodyType_(SOFTBODY_TRIMESH),
     centerOfMass_(Vector3::ZERO),
     mass_(DEFAULT_SOFT_BODY_MASS),
     collisionLayer_(DEFAULT_COLLISION_LAYER),
@@ -74,10 +86,13 @@ SoftBody::SoftBody(Context* context) :
     configMT_(DEFAULT_CONFIG_VALUE),
     configVC_(DEFAULT_CONFIG_VALUE),
     configPR_(DEFAULT_CONFIG_PR),
+    configDP_(0.0f),
+    configCHR_(0.0f),
     adaptAndClearNodeTransform_(true),
     createFromStaticModel_(false),
     clothParam_(false),
-    anchorBody_(false)
+    anchorBody_(false),
+    minRopeHeightTolerance_(MIN_ROPE_HEIGHT_TOLERANCE)
 {
     SetUpdateEventMask(USE_FIXEDPOSTUPDATE);
 }
@@ -94,6 +109,7 @@ void SoftBody::RegisterObject(Context* context)
 {
     context->RegisterFactory<SoftBody>(PHYSICS_CATEGORY);
 
+    URHO3D_ENUM_ATTRIBUTE("SoftBody Type", softBodyType_, typeNames, SOFTBODY_TRIMESH, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Mass", float, mass_, 0.0f, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Create From StaticModel", bool, createFromStaticModel_, false, AM_DEFAULT);
     URHO3D_ATTRIBUTE("Use Cloth Param", bool, clothParam_, false, AM_DEFAULT);
@@ -104,16 +120,36 @@ void SoftBody::RegisterObject(Context* context)
 
 void SoftBody::ApplyAttributes()
 {
-    if (createFromStaticModel_)
+    switch (softBodyType_)
     {
+    case SOFTBODY_TRIMESH:
         CreateFromStaticModel();
+        break;
+
+    case SOFTBODY_STICK:
+        CreateStickFromStaticModel(1);
+        break;
+
+    case SOFTBODY_ROPE:
+        CreateRopeFromStaticModel(2);
+        break;
     }
+    
 
     ApplyClothSetting();
     ApplyWindSetting();
     CopyNodesTransform();
     AddBodyToWorld();
     AnchorToRigidBody();
+}
+
+void SoftBody::SetSoftBodyType(SoftBodyType sftype)
+{
+    if (sftype != softBodyType_)
+    {
+        softBodyType_ = sftype;
+        MarkNetworkUpdate();
+    }
 }
 
 void SoftBody::CopyNodesTransform()
@@ -136,7 +172,7 @@ void SoftBody::ApplyClothSetting()
 
             body_->generateBendingConstraints(2);
             
-            body_->m_cfg.kLF = 0.05;
+            body_->m_cfg.kLF = 0.05f;
             body_->m_cfg.kDG = 0.01f;
         }
     }
@@ -169,12 +205,130 @@ bool SoftBody::CreateFromStaticModel()
 
     if (smodel)
     {
+        if (softBodyType_ != SOFTBODY_TRIMESH)
+        {
+            softBodyType_ = SOFTBODY_TRIMESH;
+        }
+
+        // clone
         smodel->SetModel(smodel->GetModel()->Clone());
 
         return CreateFromModel(smodel->GetModel());
     }
 
     return false;
+}
+
+bool SoftBody::CreateStickFromStaticModel(int fixed)
+{
+    StaticModel *smodel = node_->GetComponent<StaticModel>();
+
+    if (smodel)
+    {
+        if (softBodyType_ != SOFTBODY_STICK)
+        {
+            softBodyType_ = SOFTBODY_STICK;
+        }
+
+        // clone
+        smodel->SetModel(smodel->GetModel()->Clone());
+
+        if (ConstructRopeData(smodel->GetModel()))
+        {
+            // for sticks, add the zeroth point below the mesh's 1st pt
+            PODVector<btVector3> btVectorList(ropePointList_.Size() + 1);
+            btVectorList[0] = ToBtVector3(ropePointList_[0] + Vector3(0.0f, -0.2f, 0.0f));
+
+            for ( unsigned i = 0; i < ropePointList_.Size(); ++i )
+            {
+                btVectorList[i+1] = ToBtVector3(ropePointList_[i]);
+            }
+
+            int r = (int)btVectorList.Size();
+            body_ = new btSoftBody(physicsWorld_->GetWorldInfo(), r, &btVectorList[0], 0);
+
+            // anchor pts
+            if (fixed&1) body_->setMass(0,0);
+            if (fixed&2) body_->setMass(r-1,0);
+
+            // clear the default values and change it to softbody's config behavior for rope
+            ClearDefaultSettings();
+            SetConfigDP(0.005f);
+            SetConfigCHR(0.1f);
+
+            // create links
+            for ( int i = 1; i < r; ++i )
+            {
+                body_->appendLink(i-1, i);
+            }
+
+            for ( int i = 0; i < (int)ropePointList_.Size() - 1; ++i )
+            {
+                body_->generateBendingConstraints(2 + i);
+            }
+
+            // stick also anchors node 1
+            body_->setMass(1,0);
+            body_->getCollisionShape()->setMargin(DEFAULT_COLLISION_MARGIN);
+        }
+    }
+
+    return (body_ != NULL);
+}
+
+bool SoftBody::CreateRopeFromStaticModel(int fixed)
+{
+    StaticModel *smodel = node_->GetComponent<StaticModel>();
+
+    if (smodel)
+    {
+        if (softBodyType_ != SOFTBODY_ROPE)
+        {
+            softBodyType_ = SOFTBODY_ROPE;
+        }
+
+        // clone
+        smodel->SetModel(smodel->GetModel()->Clone());
+
+        if (ConstructRopeData(smodel->GetModel()))
+        {
+            PODVector<btVector3> btVectorList(ropePointList_.Size());
+
+            for ( unsigned i = 0; i < ropePointList_.Size(); ++i )
+            {
+                btVectorList[i] = ToBtVector3(ropePointList_[i]);
+            }
+
+            int r = (int)btVectorList.Size();
+            body_ = new btSoftBody(physicsWorld_->GetWorldInfo(), r, &btVectorList[0], 0);
+
+            // anchor pts
+            if (fixed&1) body_->setMass(0,0);
+            if (fixed&2) body_->setMass(r-1,0);
+
+            // clear the default values and change it to softbody's config behavior for rope
+            ClearDefaultSettings();
+
+            // create links
+            for ( int i = 1; i < r; ++i )
+            {
+                body_->appendLink(i-1, i);
+            }
+
+            body_->m_cfg.piterations = 4;
+            body_->getCollisionShape()->setMargin(DEFAULT_COLLISION_MARGIN);
+        }
+    }
+
+    return (body_ != NULL);
+}
+
+void SoftBody::ClearDefaultSettings()
+{
+    SetConfigLST(1.0f);
+    SetConfigMT(0.0f);
+    SetConfigVC(0.0f);
+    SetConfigPR(0.0f);
 }
 
 void SoftBody::AnchorToRigidBody()
@@ -208,29 +362,20 @@ void SoftBody::AppendAnchor(RigidBody *rbody)
         unsigned elementMask = vbuffer->GetElementMask();
         unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
 
-        boundingBox_.Clear();
-
         if (vertexData)
         {
             const unsigned vertexSize = vbuffer->GetVertexSize();
 
             if (duplicatePairs_.Size() == 0)
             {
-                // vertex rders are same the same as body->m_nodes
+                // vertex orders are same as body->m_nodes
                 for (int i = 0; i < body_->m_nodes.size(); ++i)
                 {
-                    btSoftBody::Node& n = body_->m_nodes[i];
-                    Vector3 pos = ToVector3(n.m_x);
                     unsigned char *dataAlign = (vertexData + i * vertexSize);
 
-                    if (elementMask & MASK_POSITION)
-                    {
-                        dataAlign += sizeof(Vector3);
-                    }
-                    if (elementMask & MASK_NORMAL)
-                    {
-                        dataAlign += sizeof(Vector3);
-                    }
+                    if (elementMask & MASK_POSITION) dataAlign += sizeof(Vector3);
+                    if (elementMask & MASK_NORMAL) dataAlign += sizeof(Vector3);
+
                     if (elementMask & MASK_COLOR)
                     {
                         unsigned r = *reinterpret_cast<unsigned*>(dataAlign) & 0xff;
@@ -250,10 +395,55 @@ void SoftBody::AppendAnchor(RigidBody *rbody)
                     }
                 }
             }
+            else
+            {
+                PODVector<unsigned> anchorList;
 
+                for ( unsigned i = 0; i < numVertices; ++i )
+                {
+                    unsigned char *dataAlign = (vertexData + i * vertexSize);
+
+                    if (elementMask & MASK_POSITION) dataAlign += sizeof(Vector3);
+                    if (elementMask & MASK_NORMAL) dataAlign += sizeof(Vector3);
+
+                    if (elementMask & MASK_COLOR)
+                    {
+                        unsigned r = *reinterpret_cast<unsigned*>(dataAlign) & 0xff;
+
+                        // vertex color determines the anchor point
+                        if (r > 0xf0)
+                        {
+                            anchorList.Push(i);
+                        }
+                    }
+                }
+
+                for ( unsigned i = 0; i < remapList_.Size(); ++i )
+                {
+                    for (unsigned j = 0; j < anchorList.Size(); ++j )
+                    {
+                        if (remapList_[i] == anchorList[j])
+                        {
+                            if (rbody)
+                            {
+                                body_->appendAnchor(i, rbody->GetBody());
+                            }
+                            else
+                            {
+                                body_->setMass(i, 0);
+                            }
+                        }
+                    }
+                }
+            }
             vbuffer->Unlock();
         }
     }
+}
+
+void SoftBody::AnchorZeroWeight()
+{
+    AppendAnchor(NULL);
 }
 
 void SoftBody::SetMass(float mass)
@@ -578,6 +768,32 @@ void SoftBody::SetConfigPR(float pr)
     }
 }
 
+void SoftBody::SetConfigDP(float dp)
+{
+    if (body_)
+    {
+        configDP_ = dp;
+        body_->m_cfg.kDP = configDP_;
+    }
+}
+
+void SoftBody::SetConfigCHR(float chr)
+{
+    if (body_)
+    {
+        configCHR_ = chr;
+        body_->m_cfg.kCHR = configCHR_;
+    }
+}
+
+void SoftBody::GenerateBendingConstraints(int dist)
+{
+    if (body_)
+    {
+        body_->generateBendingConstraints(dist);
+    }
+}
+
 bool SoftBody::CreateFromModel(Model *model)
 {
     if (model)
@@ -643,6 +859,118 @@ bool SoftBody::CreateFromModel(Model *model)
     }
 
     return (body_ != NULL);
+}
+
+bool SoftBody::ConstructRopeData(Model *model)
+{
+    Geometry *geometry = model->GetGeometry(0, 0);
+    VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
+    IndexBuffer *ibuffer = geometry->GetIndexBuffer();
+
+    unsigned numVertices = vbuffer->GetVertexCount();
+    unsigned vertexSize = vbuffer->GetVertexSize();
+    const unsigned char *vertexData = (const unsigned char*)vbuffer->Lock(0, numVertices);
+
+    if (vertexData)
+    {
+        // gather model heights from bottom to top
+        GatherRopeHeightOrder(ropePointList_, model->GetBoundingBox().min_.y_, vertexData, vertexSize, numVertices, minRopeHeightTolerance_);
+        CollectRopeMeshPoints(meshPointList_, ropePointList_, vertexData, vertexSize, numVertices, minRopeHeightTolerance_);
+        vbuffer->Unlock();
+    }
+
+    return (ropePointList_.Size() && meshPointList_.Size());
+}
+
+void SoftBody::GatherRopeHeightOrder(PODVector<Vector3> &ropePointList, float startingHeight,
+                                     const unsigned char *vertexData, unsigned vertexSize, unsigned numVertices,
+                                     const float heightTolerance)
+{
+    ropePointList.Clear();
+    float curHeight = startingHeight;
+
+    while (true)
+    {
+        Vector3 avgPoint = Vector3::ZERO;
+        int numPts = 0;
+        float minHdelta = M_LARGE_VALUE;
+        float nextHeight = M_LARGE_VALUE;
+
+        for ( unsigned i = 0; i < numVertices; ++i )
+        {
+            const Vector3 &v0 = *reinterpret_cast<const Vector3*>(vertexData + i * vertexSize);
+            float hdelta = Abs(v0.y_ - curHeight);
+
+            if (hdelta < heightTolerance)
+            {
+                avgPoint += v0;
+                ++numPts;
+            }
+            else if (hdelta < minHdelta && v0.y_ > curHeight + heightTolerance)
+            {
+                minHdelta = hdelta;
+                nextHeight = v0.y_;
+            }
+        }
+
+        if (numPts)
+        {
+            avgPoint = avgPoint * 1.0f/(float)numPts;
+            ropePointList.Push(avgPoint);
+
+            if (nextHeight < M_LARGE_VALUE)
+            {
+                curHeight = nextHeight;
+            }
+            else
+            {
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+void SoftBody::CollectRopeMeshPoints(PODVector<MeshPoint> &meshPointList, const PODVector<Vector3> &ropePointList, 
+                                     const unsigned char *vertexData, unsigned vertexSize, unsigned numVertices,
+                                     const float heightTolerance)
+{
+    assert(ropePointList.Size() && "no rope point list found");
+
+    meshPointList.Clear();
+
+    for ( unsigned i = 0; i < ropePointList.Size(); ++i )
+    {
+        Vector3 curPoint = ropePointList[i];
+        Vector3 prevPoint = (i==0)?ropePointList[0] + Vector3(0.0f, -0.2f, 0.0f):ropePointList[i-1];
+        Vector3 upVec = (curPoint - prevPoint).Normalized();
+        float curHeight = ropePointList[i].y_;
+
+        for ( unsigned j = 0; j < numVertices; ++j )
+        {
+            const Vector3 &v0 = *reinterpret_cast<const Vector3*>(vertexData + j * vertexSize);
+            float hdelta = Abs(v0.y_ - curHeight);
+
+            if (hdelta < heightTolerance)
+            {
+                meshPointList.Resize(meshPointList.Size() + 1);
+                MeshPoint &meshPoint = meshPointList[meshPointList.Size() - 1];
+                meshPoint.crossVec_ = Vector3::ZERO;
+                Vector3 seg = v0 - curPoint;
+                if (seg.LengthSquared() > M_EPSILON)
+                {
+                    meshPoint.crossVec_ = upVec.CrossProduct(seg);
+                }
+
+                // store node and buff idx
+                meshPoint.nodeIdx_ = i;
+                meshPoint.buffIdx_ = j;
+            }
+        }
+    }
 }
 
 SharedPtr<Model> SoftBody::PruneModel(Model *model)
@@ -932,6 +1260,98 @@ void SoftBody::UpdateVertexBuffer(Model *model)
     }
 }
 
+void SoftBody::UpdateRope(Model *model)
+{
+    if (model && IsActive())
+    {
+        Geometry *geometry = model->GetGeometry(0, 0);
+        VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
+        IndexBuffer *ibuffer = geometry->GetIndexBuffer();
+
+        unsigned numVertices = vbuffer->GetVertexCount();
+        unsigned elementMask = vbuffer->GetElementMask();
+        const unsigned vertexSize = vbuffer->GetVertexSize();
+        unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
+
+        boundingBox_.Clear();
+
+        if (vertexData)
+        {
+            if (softBodyType_ == SOFTBODY_STICK)
+            {
+                // skip the zeroth node
+                for ( unsigned i = 1; i < (unsigned)body_->m_nodes.size(); ++i )
+                {
+                    Vector3 curPoint = ToVector3(body_->m_nodes[i].m_x);
+                    Vector3 prevPoint = ToVector3(body_->m_nodes[i-1].m_x);
+                    Vector3 upVec = (curPoint - prevPoint).Normalized();
+
+                    for ( unsigned j = 0; j < meshPointList_.Size(); ++j )
+                    {
+                        MeshPoint &meshPoint = meshPointList_[j];
+
+                        // stick node idx is off by 1 due to the zeroth node that we added
+                        if (meshPoint.nodeIdx_ == i - 1)
+                        {
+                            Vector3 &v0 = *reinterpret_cast<Vector3*>(vertexData + meshPoint.buffIdx_ * vertexSize);
+                            Vector3 seg = v0 - curPoint;
+                            Vector3 pt;
+
+                            if (meshPoint.crossVec_ != Vector3::ZERO)
+                            {
+                                pt = curPoint + meshPoint.crossVec_.CrossProduct(upVec);
+                            }
+                            else
+                            {
+                                pt = curPoint;
+                            }
+
+                            *reinterpret_cast<Vector3*>(vertexData + meshPoint.buffIdx_ * vertexSize) = pt;
+
+                            boundingBox_.Merge(pt);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for ( unsigned i = 0; i < (unsigned)body_->m_nodes.size(); ++i )
+                {
+                    Vector3 curPoint = ToVector3(body_->m_nodes[i].m_x);
+                    Vector3 prevPoint = (i==0)?ToVector3(body_->m_nodes[i+1].m_x):ToVector3(body_->m_nodes[i-1].m_x);
+                    Vector3 upVec = (i==0)?(prevPoint-curPoint).Normalized():(curPoint - prevPoint).Normalized();
+
+                    for ( unsigned j = 0; j < meshPointList_.Size(); ++j )
+                    {
+                        MeshPoint &meshPoint = meshPointList_[j];
+
+                        if (meshPoint.nodeIdx_ == i)
+                        {
+                            Vector3 &v0 = *reinterpret_cast<Vector3*>(vertexData + meshPoint.buffIdx_ * vertexSize);
+                            Vector3 seg = v0 - curPoint;
+                            Vector3 pt;
+
+                            if (meshPoint.crossVec_ != Vector3::ZERO)
+                            {
+                                pt = curPoint + meshPoint.crossVec_.CrossProduct(upVec);
+                            }
+                            else
+                            {
+                                pt = curPoint;
+                            }
+
+                            *reinterpret_cast<Vector3*>(vertexData + meshPoint.buffIdx_ * vertexSize) = pt;
+
+                            boundingBox_.Merge(pt);
+                        }
+                    }
+                }
+            }
+            vbuffer->Unlock();
+        }
+    }
+}
+
 void SoftBody::CheckRestCondition()
 {
     if (IsActive())
@@ -970,7 +1390,15 @@ void SoftBody::FixedPostUpdate(float timeStep)
 
         if (statModel)
         {
-            UpdateVertexBuffer(statModel->GetModel());
+            if (softBodyType_ == SOFTBODY_TRIMESH)
+            {
+                UpdateVertexBuffer(statModel->GetModel());
+            }
+            else
+            {
+                UpdateRope(statModel->GetModel());
+            }
+
             statModel->SetBoundingBox(boundingBox_);
         }
     }

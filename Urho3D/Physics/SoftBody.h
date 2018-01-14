@@ -33,6 +33,13 @@ class BoundingBox;
 class Model;
 class RigidBody;
 
+enum SoftBodyType
+{
+    SOFTBODY_TRIMESH,
+    SOFTBODY_STICK,
+    SOFTBODY_ROPE,
+};
+
 /// SoftBody component.
 class URHO3D_API SoftBody : public LogicComponent
 {
@@ -56,6 +63,12 @@ public:
     virtual void FixedPostUpdate(float timeStep);
 
     bool CreateFromStaticModel();
+    bool CreateStickFromStaticModel(int fixed);
+    bool CreateRopeFromStaticModel(int fixed);
+    void AnchorZeroWeight();
+
+    void SetSoftBodyType(SoftBodyType sftype);
+    SoftBodyType GetSoftBodyType() const { return softBodyType_; }
 
     /// Set collision layer.
     void SetCollisionLayer(unsigned layer);
@@ -102,6 +115,10 @@ public:
     void SetConfigMT(float mt);
     void SetConfigVC(float vc);
     void SetConfigPR(float pr);
+    void SetConfigDP(float dp);
+    void SetConfigCHR(float chr);
+
+    void GenerateBendingConstraints(int dist);
 
     float GetDeactivationVelocity() const   { return deactivationVelocity_; }
     bool GetFaceNormals() const             { return setToFaceNormals_; }
@@ -109,16 +126,21 @@ public:
     float GetConfigMT() const               { return configMT_; }
     float GetConfigVC() const               { return configVC_; }
     float GetConfigPR() const               { return configPR_; }
+    float GetConfigDP() const               { return configDP_; }
+    float GetConfigCHR() const              { return configCHR_; }
 
 protected:
     bool CreateFromModel(Model *model);
+    bool ConstructRopeData(Model *model);
+    void ClearDefaultSettings();
     void SetToFaceNormals(Model *model);
-    void UpdateVertexBuffer(Model *model);
     void AnchorToRigidBody();
     void AppendAnchor(RigidBody *rbody);
     void ApplyClothSetting();
     void ApplyWindSetting();
     void CopyNodesTransform();
+    void UpdateVertexBuffer(Model *model);
+    void UpdateRope(Model *model);
     /// Handle node transform being dirtied.
     virtual void OnMarkedDirty(Node* node);
     /// Handle node being assigned.
@@ -138,7 +160,8 @@ protected:
     /// Bullet soft body.
     UniquePtr<btSoftBody> body_;
     WeakPtr<PhysicsWorld> physicsWorld_;
-
+    /// softbody type.
+    SoftBodyType softBodyType_;
     /// Gravity override vector.
     Vector3 gravityOverride_;
     /// Center of mass offset.
@@ -181,6 +204,8 @@ protected:
     float configVC_;
     /// Pressure coefficient [-inf,+inf]
     float configPR_;
+    float configDP_;
+    float configCHR_;
 
     bool adaptAndClearNodeTransform_;
     bool createFromStaticModel_;
@@ -188,6 +213,26 @@ protected:
     bool anchorBody_;
     Vector3 windVelocity_;
     String anchorToRigidBodyName_;
+
+private:
+    struct MeshPoint
+    {
+        Vector3 crossVec_;
+        unsigned nodeIdx_;
+        unsigned buffIdx_;
+    };
+
+    PODVector<Vector3> ropePointList_;
+    PODVector<MeshPoint> meshPointList_;
+    float minRopeHeightTolerance_;
+
+    static void GatherRopeHeightOrder(PODVector<Vector3> &heightList, float startingHeight,
+                                      const unsigned char *vertexData, unsigned vertexSize, unsigned numVertices,
+                                      const float heightTolerance);
+    static void CollectRopeMeshPoints(PODVector<MeshPoint> &meshPointList, const PODVector<Vector3> &heightList, 
+                                      const unsigned char *vertexData, unsigned vertexSize, unsigned numVertices,
+                                      const float heightTolerance);
+
 };
 
 }

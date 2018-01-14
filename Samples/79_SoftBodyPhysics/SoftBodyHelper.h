@@ -52,8 +52,9 @@ public:
     virtual void ApplyAttributes();
 
 protected:
+    void MakeSticks();
 
 protected:
     unsigned makeType_;
-    String   nodeName_;
+    float spacing_;
 };

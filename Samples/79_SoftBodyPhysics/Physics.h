@@ -50,7 +50,7 @@ protected:
     void ChangeDebugHudText();
     void SubscribeToEvents();
     void MoveCamera(float timeStep);
-    void SpawnObject(bool softbody);
+    void SpawnObject(int objtype);
     void HandleUpdate(StringHash eventType, VariantMap& eventData);
     void HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData);
 

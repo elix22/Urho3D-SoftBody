@@ -131,11 +131,14 @@ void Physics::CreateInstructions()
     Text* instructionText = ui->GetRoot()->CreateChild<Text>();
     instructionText->SetText(
         "Use WASD keys and mouse to move\n"
-        "LMB: softbody object, RMB: physics object\n"
-        "SPACEBAR: dbg physics\n"
+        "LMB: softbody object, RMB: box object\n"
+        "MMB: sphere object, SPACEBAR: dbg physics\n"
     );
     instructionText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 12);
-    instructionText->SetColor(Color::GREEN);
+    instructionText->SetColor(Color::CYAN);
+    instructionText->SetTextEffect(TE_SHADOW);
+    instructionText->SetEffectColor(Color(0.0f, 0.3f, 0.3f));
+    instructionText->SetEffectStrokeThickness(1);
     // The text has multiple rows. Center them in relation to each other
     instructionText->SetTextAlignment(HA_CENTER);
 
@@ -209,16 +212,18 @@ void Physics::MoveCamera(float timeStep)
 
     // "Shoot" a physics object with left mousebutton
     if (input->GetMouseButtonPress(MOUSEB_LEFT))
-        SpawnObject(true);
+        SpawnObject(0);
     if (input->GetMouseButtonPress(MOUSEB_RIGHT))
-        SpawnObject(false);
+        SpawnObject(1);
+    if (input->GetMouseButtonPress(MOUSEB_MIDDLE))
+        SpawnObject(2);
 
     // Toggle physics debug geometry with space
     if (input->GetKeyPress(KEY_SPACE))
         drawDebug_ = !drawDebug_;
 }
 
-void Physics::SpawnObject(bool softbody)
+void Physics::SpawnObject(int objtype)
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
     const float OBJECT_VELOCITY = 10.0f;
@@ -226,7 +231,7 @@ void Physics::SpawnObject(bool softbody)
     // Create a smaller box at camera position
     Node* boxNode = scene_->CreateChild("SmallBox");
 
-    if (softbody)
+    if (objtype == 0)
     {
         StaticModel *boxObject = boxNode->CreateComponent<StaticModel>();
         boxObject->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
@@ -243,7 +248,7 @@ void Physics::SpawnObject(bool softbody)
         // consider enabling this only for models such as a box
         //softbody->SetFaceNormals(true);
     }
-    else
+    else if (objtype == 1)
     {
         boxNode->SetPosition(cameraNode_->GetPosition() + cameraNode_->GetDirection());
         boxNode->SetRotation(cameraNode_->GetRotation());
@@ -259,6 +264,25 @@ void Physics::SpawnObject(bool softbody)
         body->SetFriction(0.75f);
         CollisionShape* shape = boxNode->CreateComponent<CollisionShape>();
         shape->SetBox(Vector3::ONE);
+        body->SetLinearVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * OBJECT_VELOCITY);
+    }
+    else
+    {
+        boxNode->SetPosition(cameraNode_->GetPosition() + cameraNode_->GetDirection());
+        boxNode->SetRotation(cameraNode_->GetRotation());
+        boxNode->SetScale(0.75f);
+        StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
+        boxObject->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
+        boxObject->SetMaterial(cache->GetResource<Material>("Materials/cubeMat.xml"));
+        boxObject->SetCastShadows(true);
+
+        // Create physics components, use a smaller mass also
+        RigidBody* body = boxNode->CreateComponent<RigidBody>();
+        body->SetMass(0.5f);
+        body->SetFriction(0.75f);
+        body->SetAngularDamping(0.5f);
+        CollisionShape* shape = boxNode->CreateComponent<CollisionShape>();
+        shape->SetSphere(1.0f);
         body->SetLinearVelocity(cameraNode_->GetRotation() * Vector3(0.0f, 0.25f, 1.0f) * OBJECT_VELOCITY);
     }
 }
