@@ -31,6 +31,7 @@ namespace Urho3D
 class PhysicsWorld;
 class BoundingBox;
 class Model;
+class RigidBody;
 
 /// SoftBody component.
 class URHO3D_API SoftBody : public LogicComponent
@@ -44,6 +45,8 @@ public:
     virtual ~SoftBody();
     /// Register object factory.
     static void RegisterObject(Context* context);
+
+    virtual void ApplyAttributes();
     /// Generate model based on Bullet Mesh.
     static SharedPtr<Model> CreateModelFromBulletMesh(Context *context, float *varray, int numVertices, int *iarray, int numTriangles);
 
@@ -62,11 +65,11 @@ public:
     void SetCollisionLayerAndMask(unsigned layer, unsigned mask);
     /// Set mass. Zero mass makes the body static.
     void SetMass(float mass);
-    /// Set rigid body position in world space.
+    /// Set softbody position in world space.
     void SetPosition(const Vector3& position);
-    /// Set rigid body rotation in world space.
+    /// Set softbody rotation in world space.
     void SetRotation(const Quaternion& rotation);
-    /// Set rigid body position and rotation in world space as an atomic operation.
+    /// Set softbody position and rotation in world space as atomic peration. 
     void SetTransform(const Vector3& position, const Quaternion& rotation);
     /// Set scale.
     void SetScale(const Vector3& scale);
@@ -77,10 +80,12 @@ public:
     btSoftBody* GetBody() const { return body_.Get(); }
     /// Return mass.
     float GetMass() const { return mass_; }
-    /// Return rigid body position in world space.
+    /// Return softbody position in world space.
     Vector3 GetPosition() const;
-    /// Return rigid body rotation in world space.
+    /// Return softbody rotation in world space.
     Quaternion GetRotation() const;
+    /// Return softbody transform in world space.
+    Matrix3x4 GetTransform() const;
 
     /// Activate.
     void Activate();
@@ -109,6 +114,11 @@ protected:
     bool CreateFromModel(Model *model);
     void SetToFaceNormals(Model *model);
     void UpdateVertexBuffer(Model *model);
+    void AnchorToRigidBody();
+    void AppendAnchor(RigidBody *rbody);
+    void ApplyClothSetting();
+    void ApplyWindSetting();
+    void CopyNodesTransform();
     /// Handle node transform being dirtied.
     virtual void OnMarkedDirty(Node* node);
     /// Handle node being assigned.
@@ -171,6 +181,13 @@ protected:
     float configVC_;
     /// Pressure coefficient [-inf,+inf]
     float configPR_;
+
+    bool adaptAndClearNodeTransform_;
+    bool createFromStaticModel_;
+    bool clothParam_;
+    bool anchorBody_;
+    Vector3 windVelocity_;
+    String anchorToRigidBodyName_;
 };
 
 }

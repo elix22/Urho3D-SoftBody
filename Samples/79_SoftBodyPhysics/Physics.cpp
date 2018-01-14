@@ -46,6 +46,7 @@
 #include <Urho3D/UI/UI.h>
 
 #include "Physics.h"
+#include "SoftBodyHelper.h"
 
 #include <Urho3D/DebugNew.h>
 //=============================================================================
@@ -58,6 +59,7 @@ Physics::Physics(Context* context) :
     Sample(context),
     drawDebug_(false)
 {
+    SoftBodyHelper::RegisterObject(context_);
 }
 
 void Physics::Setup()
@@ -106,7 +108,18 @@ void Physics::CreateScene()
     camera->SetFarClip(500.0f);
 
     // Set an initial position for the camera scene node above the floor
-    cameraNode_->SetPosition(Vector3(0.0f, 5.0f, -20.0f));
+    Node *camSpawnNode = scene_->GetChild("cameraSpawn");
+    if (camSpawnNode)
+    {
+        cameraNode_->SetPosition(camSpawnNode->GetPosition());
+
+        pitch_ = camSpawnNode->GetRotation().EulerAngles().z_;
+        yaw_ = camSpawnNode->GetRotation().EulerAngles().y_;
+    }
+    else
+    {
+        cameraNode_->SetPosition(Vector3(0.0f, 2.0f, -5.0f));
+    }
 }
 
 void Physics::CreateInstructions()
@@ -216,9 +229,8 @@ void Physics::SpawnObject(bool softbody)
     if (softbody)
     {
         StaticModel *boxObject = boxNode->CreateComponent<StaticModel>();
-        SharedPtr<Model> model = cache->GetResource<Model>("Models/Sphere.mdl")->Clone();
-        boxObject->SetModel(model);
-        boxObject->SetMaterial(cache->GetResource<Material>("Materials/uvMat.xml")->Clone());
+        boxObject->SetModel(cache->GetResource<Model>("Models/Sphere.mdl"));
+        boxObject->SetMaterial(cache->GetResource<Material>("Materials/uvMat.xml"));
         boxObject->SetCastShadows(true);
 
         SoftBody *softbody = boxNode->CreateComponent<SoftBody>();

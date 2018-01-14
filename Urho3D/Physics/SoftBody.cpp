@@ -27,6 +27,7 @@
 #include "../Physics/PhysicsUtils.h"
 #include "../Physics/PhysicsWorld.h"
 #include "../Physics/SoftBody.h"
+#include "../Physics/RigidBody.h"
 #include "../Scene/Scene.h"
 #include "../Scene/SmoothedTransform.h"
 
@@ -72,7 +73,11 @@ SoftBody::SoftBody(Context* context) :
     configLST_(DEFAULT_CONFIG_VALUE),
     configMT_(DEFAULT_CONFIG_VALUE),
     configVC_(DEFAULT_CONFIG_VALUE),
-    configPR_(DEFAULT_CONFIG_PR)
+    configPR_(DEFAULT_CONFIG_PR),
+    adaptAndClearNodeTransform_(true),
+    createFromStaticModel_(false),
+    clothParam_(false),
+    anchorBody_(false)
 {
     SetUpdateEventMask(USE_FIXEDPOSTUPDATE);
 }
@@ -88,6 +93,70 @@ SoftBody::~SoftBody()
 void SoftBody::RegisterObject(Context* context)
 {
     context->RegisterFactory<SoftBody>(PHYSICS_CATEGORY);
+
+    URHO3D_ATTRIBUTE("Mass", float, mass_, 0.0f, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Create From StaticModel", bool, createFromStaticModel_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Use Cloth Param", bool, clothParam_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Anchor Body", bool, anchorBody_, false, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Anchor To RigidBody", String, anchorToRigidBodyName_, String::EMPTY, AM_DEFAULT);
+    URHO3D_ATTRIBUTE("Wind Velocity", Vector3, windVelocity_, Vector3::ZERO, AM_DEFAULT);
+}
+
+void SoftBody::ApplyAttributes()
+{
+    if (createFromStaticModel_)
+    {
+        CreateFromStaticModel();
+    }
+
+    ApplyClothSetting();
+    ApplyWindSetting();
+    CopyNodesTransform();
+    AddBodyToWorld();
+    AnchorToRigidBody();
+}
+
+void SoftBody::CopyNodesTransform()
+{
+    SetTransform(node_->GetPosition(), node_->GetRotation());
+    node_->SetPosition(Vector3::ZERO);
+    node_->SetRotation(Quaternion::IDENTITY);
+}
+
+void SoftBody::ApplyClothSetting()
+{
+    if (body_)
+    {
+        if (clothParam_)
+        {
+            SetConfigLST(0.1f);
+            SetConfigMT(0.0f);
+            SetConfigVC(0.0f);
+            SetConfigPR(0.0f);
+
+            body_->generateBendingConstraints(2);
+            
+            body_->m_cfg.kLF = 0.05;
+            body_->m_cfg.kDG = 0.01f;
+        }
+    }
+}
+
+void SoftBody::ApplyWindSetting()
+{
+    if (body_)
+    {
+        if (windVelocity_ != Vector3::ZERO)
+        {
+            body_->m_cfg.piterations = 2;
+            body_->m_cfg.aeromodel = btSoftBody::eAeroModel::V_TwoSidedLiftDrag;
+
+            body_->setWindVelocity(ToBtVector3(windVelocity_));
+
+            // disable deactivation
+            SetDeactivationVelocity(0.0f);
+        }
+    }
 }
 
 void SoftBody::DelayedStart()
@@ -100,10 +169,91 @@ bool SoftBody::CreateFromStaticModel()
 
     if (smodel)
     {
+        smodel->SetModel(smodel->GetModel()->Clone());
+
         return CreateFromModel(smodel->GetModel());
     }
 
     return false;
+}
+
+void SoftBody::AnchorToRigidBody()
+{
+    if (body_ && anchorBody_)
+    {
+        Node *rbodyNode = GetScene()->GetChild(anchorToRigidBodyName_, true);
+        RigidBody *rbody = NULL;
+
+        if (rbodyNode)
+        {
+            // should be immediate child
+            rbody = rbodyNode->GetComponent<RigidBody>();
+        }
+
+        AppendAnchor(rbody);
+    }
+}
+
+void SoftBody::AppendAnchor(RigidBody *rbody)
+{
+    Model *model = node_->GetComponent<StaticModel>()->GetModel();
+
+    if (model)
+    {
+        Geometry *geometry = model->GetGeometry(0, 0);
+        VertexBuffer *vbuffer = geometry->GetVertexBuffer(0);
+        IndexBuffer *ibuffer = geometry->GetIndexBuffer();
+
+        unsigned numVertices = vbuffer->GetVertexCount();
+        unsigned elementMask = vbuffer->GetElementMask();
+        unsigned char *vertexData = (unsigned char*)vbuffer->Lock(0, numVertices);
+
+        boundingBox_.Clear();
+
+        if (vertexData)
+        {
+            const unsigned vertexSize = vbuffer->GetVertexSize();
+
+            if (duplicatePairs_.Size() == 0)
+            {
+                // vertex rders are same the same as body->m_nodes
+                for (int i = 0; i < body_->m_nodes.size(); ++i)
+                {
+                    btSoftBody::Node& n = body_->m_nodes[i];
+                    Vector3 pos = ToVector3(n.m_x);
+                    unsigned char *dataAlign = (vertexData + i * vertexSize);
+
+                    if (elementMask & MASK_POSITION)
+                    {
+                        dataAlign += sizeof(Vector3);
+                    }
+                    if (elementMask & MASK_NORMAL)
+                    {
+                        dataAlign += sizeof(Vector3);
+                    }
+                    if (elementMask & MASK_COLOR)
+                    {
+                        unsigned r = *reinterpret_cast<unsigned*>(dataAlign) & 0xff;
+
+                        // vertex color determines the anchor point
+                        if (r > 0xf0)
+                        {
+                            if (rbody)
+                            {
+                                body_->appendAnchor(i, rbody->GetBody());
+                            }
+                            else
+                            {
+                                body_->setMass(i, 0);
+                            }
+                        }
+                    }
+                }
+            }
+
+            vbuffer->Unlock();
+        }
+    }
 }
 
 void SoftBody::SetMass(float mass)
@@ -124,11 +274,7 @@ void SoftBody::SetPosition(const Vector3& position)
     {
         btTransform& worldTrans = body_->getWorldTransform();
         worldTrans.setOrigin(ToBtVector3(position + ToQuaternion(worldTrans.getRotation()) * centerOfMass_));
-
-        // When forcing the physics position, set also interpolated position so that there is no jitter
-        btTransform interpTrans = body_->getInterpolationWorldTransform();
-        interpTrans.setOrigin(worldTrans.getOrigin());
-        body_->transform(interpTrans);
+        body_->transform(worldTrans);
 
         Activate();
         MarkNetworkUpdate();
@@ -145,11 +291,7 @@ void SoftBody::SetRotation(const Quaternion& rotation)
         if (!centerOfMass_.Equals(Vector3::ZERO))
             worldTrans.setOrigin(ToBtVector3(oldPosition + rotation * centerOfMass_));
 
-        btTransform interpTrans = body_->getInterpolationWorldTransform();
-        interpTrans.setRotation(worldTrans.getRotation());
-        if (!centerOfMass_.Equals(Vector3::ZERO))
-            interpTrans.setOrigin(worldTrans.getOrigin());
-        body_->transform(interpTrans);
+        body_->transform(worldTrans);
 
         Activate();
         MarkNetworkUpdate();
@@ -164,9 +306,6 @@ void SoftBody::SetTransform(const Vector3& position, const Quaternion& rotation)
         worldTrans.setRotation(ToBtQuaternion(rotation));
         worldTrans.setOrigin(ToBtVector3(position + rotation * centerOfMass_));
 
-        btTransform interpTrans = body_->getInterpolationWorldTransform();
-        interpTrans.setOrigin(worldTrans.getOrigin());
-        interpTrans.setRotation(worldTrans.getRotation());
         body_->transform(worldTrans);
 
         Activate();
@@ -217,8 +356,7 @@ Vector3 SoftBody::GetPosition() const
 {
     if (body_)
     {
-        const btTransform& transform = body_->getWorldTransform();
-        return ToVector3(transform.getOrigin()) - ToQuaternion(transform.getRotation()) * centerOfMass_;
+        return ToVector3(body_->m_pose.m_com);
     }
 
     return Vector3::ZERO;
@@ -226,7 +364,19 @@ Vector3 SoftBody::GetPosition() const
 
 Quaternion SoftBody::GetRotation() const
 {
-    return body_ ? ToQuaternion(body_->getWorldTransform().getRotation()) : Quaternion::IDENTITY;
+    if (body_)
+    {
+        // sofbody uses rotation * scale in the computation
+        btTransform xform = btTransform(body_->m_pose.m_rot*body_->m_pose.m_scl);
+        return ToQuaternion(xform.getRotation());
+    }
+
+    return Quaternion::IDENTITY;
+}
+
+Matrix3x4 SoftBody::GetTransform() const
+{
+    return Matrix3x4(GetPosition(), GetRotation(), 1.0f);
 }
 
 void SoftBody::Activate()
@@ -680,7 +830,7 @@ void SoftBody::SetToFaceNormals(Model *model)
                 Vector3 &v1 = *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize);
                 Vector3 &v2 = *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize);
 
-                Vector3 n = (v1 - v0).CrossProduct(v2 - v0).Normalized();
+                Vector3 n = ((v1 - v0).CrossProduct(v2 - v0)).Normalized();
                 *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize + sizeof(Vector3)) = n;
                 *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize + sizeof(Vector3)) = n;
                 *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize + sizeof(Vector3)) = n;
@@ -881,7 +1031,7 @@ SharedPtr<Model> SoftBody::CreateModelFromBulletMesh(Context *context, float *va
             const Vector3 &v1 = *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize);
             const Vector3 &v2 = *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize);
 
-            Vector3 n = (v1 - v0).CrossProduct(v2 - v0).Normalized();
+            Vector3 n = ((v1 - v0).CrossProduct(v2 - v0)).Normalized();
             *reinterpret_cast<Vector3*>(vertexData + i0 * vertexSize + sizeof(Vector3)) += n;
             *reinterpret_cast<Vector3*>(vertexData + i1 * vertexSize + sizeof(Vector3)) += n;
             *reinterpret_cast<Vector3*>(vertexData + i2 * vertexSize + sizeof(Vector3)) += n;

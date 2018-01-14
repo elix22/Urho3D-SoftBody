@@ -4,11 +4,11 @@
 	<attribute name="Time Scale" value="1" />
 	<attribute name="Smoothing Constant" value="50" />
 	<attribute name="Snap Threshold" value="5" />
-	<attribute name="Elapsed Time" value="0" />
-	<attribute name="Next Replicated Node ID" value="9" />
-	<attribute name="Next Replicated Component ID" value="17" />
-	<attribute name="Next Local Node ID" value="16777229" />
-	<attribute name="Next Local Component ID" value="16777372" />
+	<attribute name="Elapsed Time" value="64.7622" />
+	<attribute name="Next Replicated Node ID" value="12" />
+	<attribute name="Next Replicated Component ID" value="22" />
+	<attribute name="Next Local Node ID" value="16777285" />
+	<attribute name="Next Local Component ID" value="16777487" />
 	<attribute name="Variables" />
 	<attribute name="Variable Names" value="" />
 	<component type="Octree" id="1" />
@@ -75,5 +75,54 @@
 		</component>
 		<component type="RigidBody" id="8" />
 		<component type="CollisionShape" id="15" />
+	</node>
+	<node id="16777279">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Cloth" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="3.72675e-08 0.920657 0.6" />
+		<attribute name="Rotation" value="0.707107 0 0.707107 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="StaticModel" id="16777447">
+			<attribute name="Model" value="Model;Models/Cloth.mdl" />
+			<attribute name="Material" value="Material;Materials/ClothMat.xml" />
+		</component>
+		<component type="SoftBody" id="16777448" >
+			<attribute name="Mass" value="2" />
+			<attribute name="Create From StaticModel" value="true" />
+			<attribute name="Use Cloth Param" value="true" />
+			<attribute name="Anchor Body" value="true" />
+			<attribute name="Wind Velocity" value="50, -12.0, 15.0" />
+		</component>
+	</node>
+	<node id="16777284">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="Cloth" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="0 0.920657 -0.6" />
+		<attribute name="Rotation" value="0.707107 0 0.707107 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
+		<component type="StaticModel" id="16777485">
+			<attribute name="Model" value="Model;Models/Cloth.mdl" />
+			<attribute name="Material" value="Material;Materials/ClothMat.xml" />
+		</component>
+		<component type="SoftBody" id="16777486" >
+			<attribute name="Mass" value="2" />
+			<attribute name="Create From StaticModel" value="true" />
+			<attribute name="Use Cloth Param" value="true" />
+			<attribute name="Anchor Body" value="true" />
+			<attribute name="Wind Velocity" value="40, -12.0, 5.0" />
+		</component>
+	</node>
+	<node id="11">
+		<attribute name="Is Enabled" value="true" />
+		<attribute name="Name" value="cameraSpawn" />
+		<attribute name="Tags" />
+		<attribute name="Position" value="8.30285 1.21911 0" />
+		<attribute name="Rotation" value="0.707107 0 -0.707107 0" />
+		<attribute name="Scale" value="1 1 1" />
+		<attribute name="Variables" />
 	</node>
 </scene>
