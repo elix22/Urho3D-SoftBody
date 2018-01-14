@@ -109,7 +109,7 @@
 			<attribute name="Material" value="Material;Materials/ClothMat.xml" />
 		</component>
 		<component type="SoftBody" id="16777486" >
-			<attribute name="Mass" value="2" />
+			<attribute name="Mass" value="0.4" />
 			<attribute name="Create From StaticModel" value="true" />
 			<attribute name="Use Cloth Param" value="true" />
 			<attribute name="Anchor Body" value="true" />
