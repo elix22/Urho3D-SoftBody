@@ -1293,7 +1293,6 @@ void SoftBody::UpdateRope(Model *model)
                         // stick node idx is off by 1 due to the zeroth node that we added
                         if (meshPoint.nodeIdx_ == i - 1)
                         {
-                            Vector3 &v0 = *reinterpret_cast<Vector3*>(vertexData + meshPoint.buffIdx_ * vertexSize);
                             Vector3 pt;
 
                             if (meshPoint.crossVec_ != Vector3::ZERO)
@@ -1326,7 +1325,6 @@ void SoftBody::UpdateRope(Model *model)
 
                         if (meshPoint.nodeIdx_ == i)
                         {
-                            Vector3 &v0 = *reinterpret_cast<Vector3*>(vertexData + meshPoint.buffIdx_ * vertexSize);
                             Vector3 pt;
 
                             if (meshPoint.crossVec_ != Vector3::ZERO)
