@@ -95,7 +95,7 @@
 		<attribute name="Variables" />
 		<component type="StaticModel" id="16777447">
 			<attribute name="Model" value="Model;Models/Cloth.mdl" />
-			<attribute name="Material" value="Material;Materials/uvMat.xml" />
+			<attribute name="Material" value="Material;Materials/ClothMat.xml" />
 		</component>
 		<component type="SoftBody" id="16777448" >
 			<attribute name="Mass" value="2" />
@@ -116,7 +116,7 @@
 		<attribute name="Variables" />
 		<component type="StaticModel" id="16777485">
 			<attribute name="Model" value="Model;Models/Cloth.mdl" />
-			<attribute name="Material" value="Material;Materials/uvMat.xml" />
+			<attribute name="Material" value="Material;Materials/ClothMat.xml" />
 		</component>
 		<component type="SoftBody" id="16777486" >
 			<attribute name="SoftBody Type" value="TriMesh" />
