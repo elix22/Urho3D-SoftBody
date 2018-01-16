@@ -61,6 +61,7 @@ void SoftBodyHelper::MakeSticks()
 {
     ResourceCache* cache = GetSubsystem<ResourceCache>();
     Model *model = cache->GetResource<Model>("Models/Stick.mdl");
+    Material *material = cache->GetResource<Material>("Materials/uvMat.xml");
     Vector3 nodepos = node_->GetWorldPosition();
 
     int n = 16;
@@ -78,7 +79,7 @@ void SoftBodyHelper::MakeSticks()
 
             StaticModel *statModel = node->CreateComponent<StaticModel>();
             statModel->SetModel(model);
-            statModel->SetMaterial(cache->GetResource<Material>("Materials/GreenMAT.xml"));
+            statModel->SetMaterial(material);
 
             SoftBody *softbody = node->CreateComponent<SoftBody>();
             softbody->SetSoftBodyType(SOFTBODY_STICK);

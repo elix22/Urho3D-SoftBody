@@ -17,6 +17,11 @@ You can change this to the typical setup by placing model Nodes in world space a
 * SetFaceNormal - apply face normal instead of average normal caused by duplicate vert removal and SoftBody update, not applicable for Bullet generated mesh, default=false.
 
 ---
+### Screenshot
+
+![alt tag](https://github.com/Lumak/Urho3D-SoftBody/blob/master/screenshot/softbody.png)
+
+---
 ### To Build
 To build it, unzip/drop the repository into your Urho3D/ folder and build it the same way as you'd build the default Samples that come with Urho3D.  
 **Built with Urho3D 1.7 tag.**
